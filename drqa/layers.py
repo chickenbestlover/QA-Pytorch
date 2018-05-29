@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-
+from cuda_functional import SRU, SRUCell
 # No modification is made to this file.
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
 
@@ -29,9 +29,22 @@ class StackedBRNN(nn.Module):
         self.rnns = nn.ModuleList()
         for i in range(num_layers):
             input_size = input_size if i == 0 else 2 * hidden_size
-            self.rnns.append(rnn_type(input_size, hidden_size,
-                                      num_layers=1,
-                                      bidirectional=True))
+            #self.rnns.append(rnn_type(input_size, hidden_size,
+            #                          num_layers=1,
+            #                          bidirectional=True))
+            self.rnns.append(SRUCell(input_size, hidden_size,
+                                 dropout = 0.0,           # dropout applied between RNN layers
+                                 rnn_dropout = 0.0,       # variational dropout applied on linear transformation
+                                 use_tanh = 1,            # use tanh?
+                                 use_relu = 0,            # use ReLU?
+                                 use_selu = 0,            # use SeLU?
+                                 bidirectional = True,   # bidirectional RNN ?
+                                 weight_norm = False,     # apply weight normalization on parameters
+                                 layer_norm = False,      # apply layer normalization on the output of each layer
+                                 highway_bias = 0,         # initial bias of highway gate (<= 0)
+                                 rescale = False
+                                 ))
+            self.rnns[i].init_weight()
 
     def forward(self, x, x_mask):
         """Can choose to either handle or ignore variable length sequences.
@@ -41,8 +54,8 @@ class StackedBRNN(nn.Module):
         if x_mask.data.sum() == 0:
             return self._forward_unpadded(x, x_mask)
         # Pad if we care or if its during eval.
-        if self.padding or not self.training:
-            return self._forward_padded(x, x_mask)
+        #if self.padding:
+        #    return self._forward_padded(x, x_mask)
         # We don't care.
         return self._forward_unpadded(x, x_mask)
 
@@ -56,11 +69,13 @@ class StackedBRNN(nn.Module):
         for i in range(self.num_layers):
             rnn_input = outputs[-1]
 
+            '''Disable this when SRU'''
             # Apply dropout to hidden input
-            if self.dropout_rate > 0:
-                rnn_input = F.dropout(rnn_input,
-                                      p=self.dropout_rate,
-                                      training=self.training)
+            #if self.dropout_rate > 0:
+            #    rnn_input = F.dropout(rnn_input,
+            #                          p=self.dropout_rate,
+            #                          training=self.training)
+
             # Forward
             rnn_output = self.rnns[i](rnn_input)[0]
             outputs.append(rnn_output)
@@ -79,7 +94,7 @@ class StackedBRNN(nn.Module):
             output = F.dropout(output,
                                p=self.dropout_rate,
                                training=self.training)
-        return output
+        return output.contiguous()
 
     def _forward_padded(self, x, x_mask):
         """Slower (significantly), but more precise,

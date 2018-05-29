@@ -14,6 +14,7 @@ from torch.autograd import Variable
 from .utils import AverageMeter
 from .rnn_reader import RnnDocReader
 
+#from .rnn_reader2 import RnnDocReader
 # Modification:
 #   - change the logger name
 #   - save & load "state_dict"s of optimizer and loss meter
@@ -60,12 +61,16 @@ class DocReaderModel(object):
                                        momentum=self.opt['momentum'],
                                        weight_decay=self.opt['weight_decay'])
         elif self.opt['optimizer'] == 'adamax':
-            self.optimizer = optim.Adamax(parameters,
+            self.optimizer = optim.Adamax(parameters,self.opt['learning_rate'],
                                           weight_decay=self.opt['weight_decay'])
         else:
             raise RuntimeError('Unsupported optimizer: %s' % self.opt['optimizer'])
         if self.opt_state_dict:
             self.optimizer.load_state_dict(self.opt_state_dict)
+
+        num_params = sum(p.data.numel() for p in parameters
+                         if p.data.data_ptr() != self.network.embedding.weight.data.data_ptr())
+        print("{} parameters".format(num_params))
 
     def update(self, ex):
         # Train mode
@@ -94,6 +99,7 @@ class DocReaderModel(object):
         # Update parameters
         self.optimizer.step()
         self.updates += 1
+
 
     def predict(self, ex):
         # Eval mode

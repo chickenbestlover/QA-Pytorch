@@ -77,7 +77,7 @@ def main():
         log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
-            model_file = os.path.join(args.model_dir, 'checkpoint_epoch.pt'.format(epoch))
+            model_file = os.path.join(args.model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
             model.save(model_file, epoch, [em, f1, best_val_score])
             if f1 > best_val_score:
                 best_val_score = f1
@@ -117,10 +117,10 @@ def setup():
                         help='reduce initial (resumed) learning rate by this factor.')
     parser.add_argument('-op', '--optimizer', default='adamax',
                         help='supported optimizer: adamax, sgd')
-    parser.add_argument('-gc', '--grad_clipping', type=float, default=20)
+    parser.add_argument('-gc', '--grad_clipping', type=float, default=10)
     parser.add_argument('-wd', '--weight_decay', type=float, default=0)
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.001,
-                        help='applied to SGD and Adamax.')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.1,
+                        help='only applied to SGD.')
     parser.add_argument('-mm', '--momentum', type=float, default=0,
                         help='only applied to SGD.')
     parser.add_argument('-tp', '--tune_partial', type=int, default=1000,
@@ -147,9 +147,12 @@ def setup():
     parser.add_argument('--dropout_rnn_output', type=str2bool, nargs='?',
                         const=True, default=True)
     parser.add_argument('--max_len', type=int, default=15)
-    parser.add_argument('--rnn_type', default='lstm',
+    parser.add_argument('--rnn_type', default='sru',
                         help='supported types: sru')
-
+    parser.add_argument('--reduction_ratio', type=int, default=4,
+                        help='reduction_ratio')
+    parser.add_argument('--num_heads', type=int, default=4,
+                        help='The number of heads')
     args = parser.parse_args()
 
     # set model dir
