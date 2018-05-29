@@ -106,7 +106,7 @@ def setup():
                         const=True, default=torch.cuda.is_available(),
                         help='whether to use GPU acceleration.')
     # training
-    parser.add_argument('-e', '--epochs', type=int, default=80)
+    parser.add_argument('-e', '--epochs', type=int, default=150)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-rs', '--resume', default='best_model.pt',
                         help='previous model file name (in `model_dir`). '

@@ -33,8 +33,8 @@ class StackedBRNN(nn.Module):
             #                          num_layers=1,
             #                          bidirectional=True))
             self.rnns.append(SRUCell(input_size, hidden_size,
-                                 dropout = 0.0,           # dropout applied between RNN layers
-                                 rnn_dropout = 0.0,       # variational dropout applied on linear transformation
+                                 dropout = dropout_rate,           # dropout applied between RNN layers
+                                 rnn_dropout = dropout_rate,       # variational dropout applied on linear transformation
                                  use_tanh = 1,            # use tanh?
                                  use_relu = 0,            # use ReLU?
                                  use_selu = 0,            # use SeLU?
