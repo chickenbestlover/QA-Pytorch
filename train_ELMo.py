@@ -11,11 +11,14 @@ from datetime import datetime
 from collections import Counter
 import torch
 import msgpack
-from drqa.model2 import DocReaderModel
+from drqa.model_ELMo import DocReaderModel
 from drqa.utils import str2bool
+from allennlp.modules.elmo import Elmo, batch_to_ids
+import os
 
 
 def main():
+
     args, log = setup()
     log.info('[Program starts. Loading data...]')
     train, dev, dev_y, embedding, opt = load_data(vars(args))
@@ -55,6 +58,10 @@ def main():
         epoch_0 = 1
         best_val_score = 0.0
 
+
+
+
+
     for epoch in range(epoch_0, epoch_0 + args.epochs):
         log.warning('Epoch {}'.format(epoch))
         # train
@@ -77,7 +84,7 @@ def main():
         log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
-            model_file = os.path.join(args.model_dir, 'checkpoint_epoch_{}.pt'.format(epoch))
+            model_file = os.path.join(args.model_dir, 'checkpoint_epoch.pt'.format(epoch))
             model.save(model_file, epoch, [em, f1, best_val_score])
             if f1 > best_val_score:
                 best_val_score = f1
@@ -92,7 +99,7 @@ def setup():
         description='Train a Document Reader model.'
     )
     # system
-    parser.add_argument('--log_per_updates', type=int, default=3,
+    parser.add_argument('--log_per_updates', type=int, default=1000,
                         help='log model loss per x updates (mini-batches).')
     parser.add_argument('--data_file', default='SQuAD/data.msgpack',
                         help='path to preprocessed data file.')
@@ -106,7 +113,7 @@ def setup():
                         const=True, default=torch.cuda.is_available(),
                         help='whether to use GPU acceleration.')
     # training
-    parser.add_argument('-e', '--epochs', type=int, default=150)
+    parser.add_argument('-e', '--epochs', type=int, default=80)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-rs', '--resume', default='best_model.pt',
                         help='previous model file name (in `model_dir`). '
@@ -120,7 +127,7 @@ def setup():
     parser.add_argument('-gc', '--grad_clipping', type=float, default=20)
     parser.add_argument('-wd', '--weight_decay', type=float, default=0)
     parser.add_argument('-lr', '--learning_rate', type=float, default=0.001,
-                        help='only applied to SGD.')
+                        help='applied to SGD and Adamax.')
     parser.add_argument('-mm', '--momentum', type=float, default=0,
                         help='only applied to SGD.')
     parser.add_argument('-tp', '--tune_partial', type=int, default=1000,
@@ -147,12 +154,9 @@ def setup():
     parser.add_argument('--dropout_rnn_output', type=str2bool, nargs='?',
                         const=True, default=True)
     parser.add_argument('--max_len', type=int, default=15)
-    parser.add_argument('--rnn_type', default='sru',
+    parser.add_argument('--rnn_type', default='lstm',
                         help='supported types: sru')
-    parser.add_argument('--reduction_ratio', type=int, default=4,
-                        help='reduction_ratio')
-    parser.add_argument('--num_heads', type=int, default=4,
-                        help='The number of heads')
+
     args = parser.parse_args()
 
     # set model dir
@@ -219,8 +223,8 @@ def load_data(opt):
         data = msgpack.load(f, encoding='utf8')
     train = data['train']
     data['dev'].sort(key=lambda x: len(x[1]))
-    dev = [x[:-1] for x in data['dev']]
-    dev_y = [x[-1] for x in data['dev']]
+    dev = [x[:-3] for x in data['dev']]
+    dev_y = [x[-3] for x in data['dev']]
     return train, dev, dev_y, embedding, opt
 
 
@@ -237,6 +241,10 @@ class BatchGen:
         self.batch_size = batch_size
         self.eval = evaluation
         self.gpu = gpu
+
+        options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
+        weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
+        self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to('cuda')
 
         # sort by len
         data = sorted(data, key=lambda x: len(x[1]))
@@ -256,10 +264,10 @@ class BatchGen:
         for batch in self.data:
             batch_size = len(batch)
             batch = list(zip(*batch))
-            #if self.eval:
-            #    assert len(batch) == 8
-            #else:
-            #    assert len(batch) == 10
+            if self.eval:
+                assert len(batch) == 10
+            else:
+                assert len(batch) == 12
 
             context_len = max(len(x) for x in batch[1])
             context_id = torch.LongTensor(batch_size, context_len).fill_(0)
@@ -292,6 +300,12 @@ class BatchGen:
             question_mask = torch.eq(question_id, 0)
             text = list(batch[6])
             span = list(batch[7])
+
+            context_text = list(batch[-2])
+            question_text = list(batch[-1])
+            context_elmo = batch_to_ids(context_text)
+            question_elmo = batch_to_ids(question_text)
+
             if not self.eval:
                 y_s = torch.LongTensor(batch[8])
                 y_e = torch.LongTensor(batch[9])
@@ -303,12 +317,18 @@ class BatchGen:
                 context_mask = context_mask.pin_memory()
                 question_id = question_id.pin_memory()
                 question_mask = question_mask.pin_memory()
+                context_elmo = context_elmo.pin_memory().cuda()
+                question_elmo = question_elmo.pin_memory().cuda()
+
+            context_elmo = self.elmo(context_elmo)['elmo_representations']
+            question_elmo = self.elmo(question_elmo)['elmo_representations']
+
             if self.eval:
                 yield (context_id, context_feature, context_tag, context_ent, context_mask,
-                       question_id, question_mask, text, span)
+                       question_id, question_mask, text, span, context_elmo, question_elmo)
             else:
                 yield (context_id, context_feature, context_tag, context_ent, context_mask,
-                       question_id, question_mask, y_s, y_e, text, span)
+                       question_id, question_mask, y_s, y_e, text, span, context_elmo, question_elmo)
 
 
 def _normalize_answer(s):

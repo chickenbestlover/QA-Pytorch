@@ -63,7 +63,20 @@ def main():
     log.info('converted to ids.')
 
 
+    '''For ELMo'''
+    ###################################################
+    train_merged = []
+    for pair1, pair2 in zip(train,train_id):
+        pair2 = pair2 + tuple([pair1[1]])
+        pair2 = pair2 + tuple([pair1[5]])
+        train_merged.append(pair2)
 
+    dev_merged = []
+    for pair1, pair2 in zip(dev,dev_id):
+        pair2 = pair2 + tuple([pair1[1]])
+        pair2 = pair2 + tuple([pair1[5]])
+        dev_merged.append(pair2)
+    ####################################################
 
     vocab_size = len(vocab)
     embeddings = np.zeros((vocab_size, args.wv_dim))
@@ -90,8 +103,8 @@ def main():
     with open('SQuAD/meta.msgpack', 'wb') as f:
         msgpack.dump(meta, f)
     result = {
-        'train': train_id,
-        'dev': dev_id,
+        'train': train_merged,
+        'dev': dev_merged,
     }
     # train: id, context_id, context_features, tag_id, ent_id,
     #        question_id, context, context_token_span, answer_start, answer_end

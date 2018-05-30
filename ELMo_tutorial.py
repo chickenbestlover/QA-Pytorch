@@ -1,9 +1,9 @@
 from allennlp.modules.elmo import Elmo, batch_to_ids
 import os
 
-CACHE_ROOT = os.getenv('ALLENNLP_CACHE_ROOT', os.path.expanduser(os.path.join('~', '.allennlp')))
-DATASET_CACHE = os.path.join(CACHE_ROOT, "datasets")
-print("CACHE_FOLDER:", DATASET_CACHE)
+#CACHE_ROOT = os.getenv('ALLENNLP_CACHE_ROOT', os.path.expanduser(os.path.join('~', '.allennlp')))
+#DATASET_CACHE = os.path.join(CACHE_ROOT, "datasets")
+#print("CACHE_FOLDER:", DATASET_CACHE)
 options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
 weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
 
