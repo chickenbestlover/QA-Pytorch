@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 from drqa import layers2 as layers
 from drqa import multiAttentionRNN as custom
-from cove import MTLSTM
 # Modification: add 'pos' and 'ner' features.
 # Origin: https://github.com/facebookresearch/ParlAI/tree/master/parlai/agents/drqa
 

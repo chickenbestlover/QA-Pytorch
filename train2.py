@@ -11,7 +11,7 @@ from datetime import datetime
 from collections import Counter
 import torch
 import msgpack
-from drqa.model import DocReaderModel
+from drqa.model2 import DocReaderModel
 from drqa.utils import str2bool
 
 
