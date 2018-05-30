@@ -18,7 +18,7 @@ from drqa.utils import str2bool
 def main():
     args, log = setup()
     log.info('[Program starts. Loading data...]')
-    train, dev, dev_y, embedding, opt = load_data(vars(args))
+    train, dev, dev_y, embedding, opt, train_elmo, dev_elmo = load_data(vars(args))
     log.info(opt)
     log.info('[Data loaded.]')
 
@@ -58,7 +58,7 @@ def main():
     for epoch in range(epoch_0, epoch_0 + args.epochs):
         log.warning('Epoch {}'.format(epoch))
         # train
-        batches = BatchGen(train, batch_size=args.batch_size, gpu=args.cuda)
+        batches = BatchGen(train,train_elmo, batch_size=args.batch_size, gpu=args.cuda)
         start = datetime.now()
         for i, batch in enumerate(batches):
             model.update(batch)
@@ -215,17 +215,19 @@ def load_data(opt):
     with open(opt['data_file'], 'rb') as f:
         data = msgpack.load(f, encoding='utf8')
     train = data['train']
+    train_elmo = data['train_elmo']
+    dev_elmo = data['dev_elmo']
     data['dev'].sort(key=lambda x: len(x[1]))
     dev = [x[:-1] for x in data['dev']]
     dev_y = [x[-1] for x in data['dev']]
-    return train, dev, dev_y, embedding, opt
+    return train, dev, dev_y, embedding, opt, train_elmo, dev_elmo
 
 
 class BatchGen:
     pos_size = None
     ner_size = None
 
-    def __init__(self, data, batch_size, gpu, evaluation=False):
+    def __init__(self, data,data_elmo, batch_size, gpu, evaluation=False):
         """
         input:
             data - list of lists
@@ -236,21 +238,23 @@ class BatchGen:
         self.gpu = gpu
 
         # sort by len
-        data = sorted(data, key=lambda x: len(x[1]))
+        zipped = list(zip(data,data_elmo[0],data_elmo[1]))
+        zipped = sorted(zipped, key=lambda x: len(x[1]))
+
         # chunk into batches
-        data = [data[i:i + batch_size] for i in range(0, len(data), batch_size)]
+        zipped = [zipped[i:i + batch_size] for i in range(0, len(zipped), batch_size)]
 
         # shuffle
         if not evaluation:
-            random.shuffle(data)
+            random.shuffle(zipped)
 
-        self.data = data
+        self.data = zipped
 
     def __len__(self):
         return len(self.data)
 
     def __iter__(self):
-        for batch in self.data:
+        for batch, elmo in zip(self.data):
             batch_size = len(batch)
             batch = list(zip(*batch))
             if self.eval:
