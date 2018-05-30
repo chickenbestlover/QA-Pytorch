@@ -37,12 +37,12 @@ class StackedBRNN(nn.Module):
             self.rnns.append(SRUCell(input_size, hidden_size,
                                      dropout=dropout_rate,  # dropout applied between RNN layers
                                      rnn_dropout=dropout_rate,  # variational dropout applied on linear transformation
-                                     use_tanh=1,  # use tanh?
+                                     use_tanh=0,  # use tanh?
                                      use_relu=0,  # use ReLU?
-                                     use_selu=0,  # use SeLU?
+                                     use_selu=1,  # use SeLU?
                                      bidirectional=True,  # bidirectional RNN ?
                                      weight_norm=False,  # apply weight normalization on parameters
-                                     layer_norm=True,  # apply layer normalization on the output of each layer
+                                     layer_norm=False,  # apply layer normalization on the output of each layer
                                      highway_bias=0,  # initial bias of highway gate (<= 0)
                                      rescale=False
                                      ))
@@ -198,7 +198,7 @@ class SeqAttnMatch(nn.Module):
         scores.data.masked_fill_(y_mask.data, -float('inf'))
 
         # Normalize with softmax
-        alpha_flat = F.softmax(scores.view(-1, y.size(1)))
+        alpha_flat = F.softmax(scores.view(-1, y.size(1)),dim=1)
         alpha = alpha_flat.view(-1, x.size(1), y.size(1))
 
         # Take weighted average
