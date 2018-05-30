@@ -119,8 +119,14 @@ class RnnDocReader(nn.Module):
             x2_weighted_emb = self.qemb_match(x1_emb, x2_emb, x2_mask)
             drnn_input_list.append(x2_weighted_emb)
         if self.opt['pos']:
+            if self.opt['dropout_emb'] > 0:
+                x1_pos = nn.functional.dropout(x1_pos, p=self.opt['dropout_emb'],
+                                               training=self.training)
             drnn_input_list.append(x1_pos)
         if self.opt['ner']:
+            if self.opt['dropout_emb'] > 0:
+                x1_ner = nn.functional.dropout(x1_ner, p=self.opt['dropout_emb'],
+                                               training=self.training)
             drnn_input_list.append(x1_ner)
         drnn_input = torch.cat(drnn_input_list, 2)
         #print('drnn_input:',drnn_input.size())

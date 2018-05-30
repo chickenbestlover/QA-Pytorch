@@ -14,7 +14,7 @@ import torch.nn.init as init
 # Modules
 # ------------------------------------------------------------------------------
 
-import cuda_functional as MF
+from cuda_functional import SRUCell
 import numpy as np
 
 class StackedBRNN(nn.Module):
@@ -34,11 +34,18 @@ class StackedBRNN(nn.Module):
             #self.rnns.append(rnn_type(input_size, hidden_size,
             #                          num_layers=1,
             #                          bidirectional=True))
-            self.rnns.append(MF.SRUCell(self.input_size, hidden_size,
-                                      dropout=dropout_rate,
-                                      rnn_dropout=dropout_rate,
-                                      use_tanh=1,
-                                      bidirectional=True))
+            self.rnns.append(SRUCell(input_size, hidden_size,
+                                     dropout=dropout_rate,  # dropout applied between RNN layers
+                                     rnn_dropout=dropout_rate,  # variational dropout applied on linear transformation
+                                     use_tanh=1,  # use tanh?
+                                     use_relu=0,  # use ReLU?
+                                     use_selu=0,  # use SeLU?
+                                     bidirectional=True,  # bidirectional RNN ?
+                                     weight_norm=False,  # apply weight normalization on parameters
+                                     layer_norm=True,  # apply layer normalization on the output of each layer
+                                     highway_bias=0,  # initial bias of highway gate (<= 0)
+                                     rescale=False
+                                     ))
 
             self.lns.append(LayerNorm(d_hid=2 * hidden_size))
 

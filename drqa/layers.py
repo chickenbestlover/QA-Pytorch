@@ -44,7 +44,7 @@ class StackedBRNN(nn.Module):
                                  highway_bias = 0,         # initial bias of highway gate (<= 0)
                                  rescale = False
                                  ))
-            self.rnns[i].init_weight()
+
 
     def forward(self, x, x_mask):
         """Can choose to either handle or ignore variable length sequences.

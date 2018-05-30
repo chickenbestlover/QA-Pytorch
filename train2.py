@@ -106,7 +106,7 @@ def setup():
                         const=True, default=torch.cuda.is_available(),
                         help='whether to use GPU acceleration.')
     # training
-    parser.add_argument('-e', '--epochs', type=int, default=80)
+    parser.add_argument('-e', '--epochs', type=int, default=150)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
     parser.add_argument('-rs', '--resume', default='best_model.pt',
                         help='previous model file name (in `model_dir`). '
@@ -117,9 +117,9 @@ def setup():
                         help='reduce initial (resumed) learning rate by this factor.')
     parser.add_argument('-op', '--optimizer', default='adamax',
                         help='supported optimizer: adamax, sgd')
-    parser.add_argument('-gc', '--grad_clipping', type=float, default=10)
+    parser.add_argument('-gc', '--grad_clipping', type=float, default=20)
     parser.add_argument('-wd', '--weight_decay', type=float, default=0)
-    parser.add_argument('-lr', '--learning_rate', type=float, default=0.1,
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.001,
                         help='only applied to SGD.')
     parser.add_argument('-mm', '--momentum', type=float, default=0,
                         help='only applied to SGD.')
