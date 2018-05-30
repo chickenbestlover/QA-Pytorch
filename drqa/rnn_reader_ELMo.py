@@ -91,16 +91,16 @@ class RnnDocReader(nn.Module):
         if opt['question_merge'] not in ['avg', 'self_attn']:
             raise NotImplementedError('question_merge = %s' % opt['question_merge'])
         if opt['question_merge'] == 'self_attn':
-            self.self_attn = layers.LinearSeqAttn(question_hidden_size)
+            self.self_attn = layers.LinearSeqAttn(question_hidden_size+1024)
 
         # Bilinear attention for span start/end
         self.start_attn = layers.BilinearSeqAttn(
-            doc_hidden_size,
-            question_hidden_size,
+            doc_hidden_size+1024,
+            question_hidden_size+1024,
         )
         self.end_attn = layers.BilinearSeqAttn(
-            doc_hidden_size,
-            question_hidden_size,
+            doc_hidden_size+1024,
+            question_hidden_size+1024,
         )
 
     def forward(self, x1, x1_f, x1_pos, x1_ner, x1_mask, x2, x2_mask,x1_elmo,x2_elmo):
@@ -150,11 +150,13 @@ class RnnDocReader(nn.Module):
         drnn_input = torch.cat(drnn_input_list, 2)
         # Encode document with RNN
         doc_hiddens = self.doc_rnn(drnn_input, x1_mask)
+        doc_hiddens = torch.cat([doc_hiddens,x1_elmo[1]],dim=2)
 
         # Encode question with RNN + merge hiddens
         qrnn_input_list = [x2_emb,x2_elmo[0]]
         qrnn_input = torch.cat(qrnn_input_list,2)
         question_hiddens = self.question_rnn(qrnn_input, x2_mask)
+        question_hiddens = torch.cat([question_hiddens,x2_elmo[1]],dim=2)
         if self.opt['question_merge'] == 'avg':
             q_merge_weights = layers.uniform_weights(question_hiddens, x2_mask)
         elif self.opt['question_merge'] == 'self_attn':
