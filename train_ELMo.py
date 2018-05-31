@@ -100,7 +100,7 @@ def setup():
         description='Train a Document Reader model.'
     )
     # system
-    parser.add_argument('--log_per_updates', type=int, default=1000,
+    parser.add_argument('--log_per_updates', type=int, default=3,
                         help='log model loss per x updates (mini-batches).')
     parser.add_argument('--data_file', default='SQuAD/data.msgpack',
                         help='path to preprocessed data file.')
@@ -199,7 +199,7 @@ def setup():
     ch.setFormatter(formatter)
     log.addHandler(fh)
     log.addHandler(ch)
-
+    log.propagate=False
     return args, log
 
 

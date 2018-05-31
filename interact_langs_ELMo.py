@@ -15,8 +15,6 @@ from sys import exit
 """
 This script serves as a template to be modified to suit all possible testing environments, including and not limited 
 to files (json, xml, csv, ...), web service, databases and so on.
-To change this script to batch model, simply modify line 70 from "BatchGen([model_in], batch_size=1, ...)" to 
-"BatchGen([model_in_1, model_in_2, ...], batch_size=batch_size, ...)".
 """
 
 class SampleGen:
