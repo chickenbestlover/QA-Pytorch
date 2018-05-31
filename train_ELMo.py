@@ -223,9 +223,8 @@ def load_data(opt):
         data = msgpack.load(f, encoding='utf8')
     train = data['train']
     data['dev'].sort(key=lambda x: len(x[1]))
-    dev = [x[:-3] for x in data['dev']]
-    dev.extend([data['dev'][-2],data['dev'][-1]])
-    dev_y = [x[-3] for x in data['dev']]
+    dev = [x[:8] + x[9:]for x in data['dev']]
+    dev_y = [x[8] for x in data['dev']]
     return train, dev, dev_y, embedding, opt
 
 
