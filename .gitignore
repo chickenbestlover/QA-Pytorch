@@ -3,3 +3,5 @@ drqa/__pycache__/
 glove/
 models/
 *.log
+.idea/
+__pycache__/
