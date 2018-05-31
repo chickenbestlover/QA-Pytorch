@@ -67,6 +67,7 @@ def main():
         # train
         batches = BatchGen(train, batch_size=args.batch_size, gpu=args.cuda)
         start = datetime.now()
+
         for i, batch in enumerate(batches):
             model.update(batch)
             if i % args.log_per_updates == 0:
@@ -74,7 +75,7 @@ def main():
                     epoch, model.updates, model.train_loss.value,
                     str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
         log.debug('\n')
-        # eval
+        # # eval
         batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
         predictions = []
         for i, batch in enumerate(batches):

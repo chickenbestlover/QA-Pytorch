@@ -139,12 +139,13 @@ class RnnDocReader(nn.Module):
                                            training=self.training)
 
             #print('x2_elmo:', x2_elmo[0].shape)
-            x1_elmo[0] = nn.functional.dropout(x1_elmo[0], p=self.opt['dropout_emb'],
+            if self.training:
+                x1_elmo[1] = nn.functional.dropout(x1_elmo[1], p=self.opt['dropout_emb'],
                                            training=self.training)
-            x2_elmo[0] = nn.functional.dropout(x2_elmo[0], p=self.opt['dropout_emb'],
+                x2_elmo[1] = nn.functional.dropout(x2_elmo[1], p=self.opt['dropout_emb'],
                                            training=self.training)
 
-        drnn_input_list = [x1_emb, x1_f,x1_elmo[0]]
+        drnn_input_list = [x1_emb, x1_f,x1_elmo[1]]
 
 
         # Add attention-weighted question representation
@@ -167,7 +168,7 @@ class RnnDocReader(nn.Module):
         #doc_hiddens = torch.cat([doc_hiddens,x1_elmo[1]],dim=2)
 
         # Encode question with RNN + merge hiddens
-        qrnn_input_list = [x2_emb,x2_elmo[0]]
+        qrnn_input_list = [x2_emb,x2_elmo[1]]
         qrnn_input = torch.cat(qrnn_input_list,2)
         question_hiddens = self.question_rnn(qrnn_input, x2_mask)
         #question_hiddens = torch.cat([question_hiddens,x2_elmo[1]],dim=2)

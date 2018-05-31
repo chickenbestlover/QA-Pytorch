@@ -107,9 +107,9 @@ class DocReaderModel(object):
 
         # Transfer to GPU
         if self.opt['cuda']:
-            inputs = [Variable(e.cuda(async=True)) for e in ex[:7]]
+            inputs = [e.cuda(async=True) for e in ex[:7]]
         else:
-            inputs = [Variable(e) for e in ex[:7]]
+            inputs = [e for e in ex[:7]]
         inputs.extend([ex[9], ex[10]])
 
         # Run forward
@@ -121,8 +121,8 @@ class DocReaderModel(object):
         score_e = score_e.data.cpu()
 
         # Get argmax text spans
-        text = ex[-2]
-        spans = ex[-1]
+        text = ex[-4]
+        spans = ex[-3]
         predictions = []
         max_len = self.opt['max_len'] or score_s.size(1)
         for i in range(score_s.size(0)):
