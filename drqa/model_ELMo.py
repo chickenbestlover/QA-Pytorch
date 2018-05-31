@@ -70,7 +70,7 @@ class DocReaderModel(object):
 
         num_params = sum(p.data.numel() for p in parameters
                          if p.data.data_ptr() != self.network.embedding.weight.data.data_ptr())
-        print("{} parameters".format(num_params))
+        print("{} parameters".format(num_params),'\n')
 
     def update(self, ex):
         # Train mode
