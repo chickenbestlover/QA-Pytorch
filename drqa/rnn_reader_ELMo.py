@@ -57,6 +57,9 @@ class RnnDocReader(nn.Module):
         if opt['ner']:
             doc_input_size += opt['ner_size']
 
+        #self.x1_ratio=torch.nn.Parameter(0.5*torch.ones(1))
+        #self.x2_ratio = torch.nn.Parameter(0.5 * torch.ones(1))
+
         # RNN document encoder
         self.doc_rnn = layers.StackedBRNN(
             input_size=doc_input_size,
@@ -140,13 +143,21 @@ class RnnDocReader(nn.Module):
 
             #print('x2_elmo:', x2_elmo[0].shape)
             if self.training:
-                x1_elmo[1] = nn.functional.dropout(x1_elmo[1], p=self.opt['dropout_emb'],
+                x1_elmo[0] = nn.functional.dropout(x1_elmo[0], p=self.opt['dropout_emb'],
                                            training=self.training)
-                x2_elmo[1] = nn.functional.dropout(x2_elmo[1], p=self.opt['dropout_emb'],
-                                           training=self.training)
+                x2_elmo[0] = nn.functional.dropout(x2_elmo[0], p=self.opt['dropout_emb'],
+                                          training=self.training)
+                # x1_elmo[1] = nn.functional.dropout(x1_elmo[1], p=self.opt['dropout_emb'],
+                #                            training=self.training)
+                # x2_elmo[1] = nn.functional.dropout(x2_elmo[1], p=self.opt['dropout_emb'],
+                #                            training=self.training)
 
-        drnn_input_list = [x1_emb, x1_f,x1_elmo[1]]
 
+        #x1_elmo_merged = self.x1_ratio*x1_elmo[1]+(1.0-self.x1_ratio)*x1_elmo[0]
+        #x2_elmo_merged = self.x2_ratio*x2_elmo[1]+(1.0-self.x2_ratio)*x2_elmo[0]
+
+        #drnn_input_list = [x1_emb, x1_f,x1_elmo_merged]
+        drnn_input_list = [x1_emb, x1_f, x1_elmo[0]]
 
         # Add attention-weighted question representation
         if self.opt['use_qemb']:
@@ -167,8 +178,11 @@ class RnnDocReader(nn.Module):
         doc_hiddens = self.doc_rnn(drnn_input, x1_mask)
         #doc_hiddens = torch.cat([doc_hiddens,x1_elmo[1]],dim=2)
 
+
         # Encode question with RNN + merge hiddens
-        qrnn_input_list = [x2_emb,x2_elmo[1]]
+        #qrnn_input_list = [x2_emb,x2_elmo_merged]
+        qrnn_input_list = [x2_emb, x2_elmo[0]]
+
         qrnn_input = torch.cat(qrnn_input_list,2)
         question_hiddens = self.question_rnn(qrnn_input, x2_mask)
         #question_hiddens = torch.cat([question_hiddens,x2_elmo[1]],dim=2)

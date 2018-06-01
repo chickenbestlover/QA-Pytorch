@@ -32,6 +32,8 @@ def main():
             opt = checkpoint['config']
         state_dict = checkpoint['state_dict']
         model = DocReaderModel(opt, embedding, state_dict)
+
+
         epoch_0 = checkpoint['epoch'] + 1
         # synchronize random seed
         random.setstate(checkpoint['random_state'])
@@ -61,7 +63,6 @@ def main():
 
 
 
-
     for epoch in range(epoch_0, epoch_0 + args.epochs):
         log.warning('Epoch {}'.format(epoch))
         # train
@@ -85,13 +86,13 @@ def main():
         log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
-            model_file = os.path.join(args.model_dir, 'checkpoint_epoch.pt'.format(epoch))
+            model_file = os.path.join(args.model_dir, 'checkpoint_epoch2.pt'.format(epoch))
             model.save(model_file, epoch, [em, f1, best_val_score])
             if f1 > best_val_score:
                 best_val_score = f1
                 copyfile(
                     model_file,
-                    os.path.join(args.model_dir, 'best_model.pt'))
+                    os.path.join(args.model_dir, 'best_model2.pt'))
                 log.info('[new best model saved.]')
 
 
