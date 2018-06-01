@@ -236,6 +236,73 @@ class BilinearSeqAttn(nn.Module):
             alpha = F.softmax(xWy, dim=1)
         return alpha
 
+class BilinearSeqAttn2(nn.Module):
+    """A bilinear attention layer over a sequence X w.r.t y:
+    * o_i = softmax(x_i'Wy) for x_i in X.
+
+    Optionally don't normalize output weights.
+    """
+    def __init__(self, x_size, y_size, h_size=None):
+        super(BilinearSeqAttn2, self).__init__()
+        if h_size == None:
+            h_size = y_size
+        self.linear1 = nn.Linear(y_size, h_size)
+        self.linear2 = nn.Linear(h_size, x_size)
+
+
+    def forward(self, x, y, x_mask):
+        """
+        x = batch * len * x_size
+        y = batch * y_size
+        x_mask = batch * len
+        """
+        W1y = F.dropout(F.relu(self.linear1(y)),training=self.training) # batch*h_size
+
+        W2W1y = self.linear2(W1y) # batch*x_size
+        xW2W1y = x.bmm(W2W1y.unsqueeze(2)).squeeze(2)
+        xW2W1y.data.masked_fill_(x_mask.data, -float('inf'))
+        if self.training:
+            # In training we output log-softmax for NLL
+            alpha = F.log_softmax(xW2W1y, dim=1)
+        else:
+            # ...Otherwise 0-1 probabilities
+            alpha = F.softmax(xW2W1y, dim=1)
+        return alpha, W2W1y
+
+class BilinearSeqAttn3(nn.Module):
+    """A bilinear attention layer over a sequence X w.r.t y:
+    * o_i = softmax(x_i'Wy) for x_i in X.
+
+    Optionally don't normalize output weights.
+    """
+    def __init__(self, x_size, y_size, h_size=None):
+        super(BilinearSeqAttn3, self).__init__()
+        if h_size == None:
+            h_size = y_size
+        self.linear1 = nn.Linear(y_size, h_size)
+        self.linear2 = nn.Linear(h_size, x_size)
+        self.linear3 = nn.Linear(h_size, h_size)
+        self.ln = nn.LayerNorm(h_size)
+
+    def forward(self, x, y, x_mask,h):
+        """
+        x = batch * len * x_size
+        y = batch * y_size
+        x_mask = batch * len
+        """
+        W1y = F.dropout(F.relu(self.ln(self.linear1(y)+self.linear3(h))),
+                        training=self.training) # batch*h_size
+
+        W2W1y = self.linear2(W1y) # batch*x_size
+        xW2W1y = x.bmm(W2W1y.unsqueeze(2)).squeeze(2)
+        xW2W1y.data.masked_fill_(x_mask.data, -float('inf'))
+        if self.training:
+            # In training we output log-softmax for NLL
+            alpha = F.log_softmax(xW2W1y, dim=1)
+        else:
+            # ...Otherwise 0-1 probabilities
+            alpha = F.softmax(xW2W1y, dim=1)
+        return alpha
 
 class LinearSeqAttn(nn.Module):
     """Self attention over a sequence:
