@@ -11,7 +11,7 @@ from datetime import datetime
 from collections import Counter
 import torch
 import msgpack
-from drqa.model_ELMo2 import DocReaderModel
+from drqa.model_ELMo3 import DocReaderModel
 from drqa.utils import str2bool
 from allennlp.modules.elmo import Elmo, batch_to_ids
 import os
@@ -86,13 +86,13 @@ def main():
         log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
         if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
-            model_file = os.path.join(args.model_dir, 'checkpoint_epoch.pt'.format(epoch))
+            model_file = os.path.join(args.model_dir, 'checkpoint3.pt'.format(epoch))
             model.save(model_file, epoch, [em, f1, best_val_score])
             if f1 > best_val_score:
                 best_val_score = f1
                 copyfile(
                     model_file,
-                    os.path.join(args.model_dir, 'best_model.pt'))
+                    os.path.join(args.model_dir, 'best_model3.pt'))
                 log.info('[new best model saved.]')
 
 
@@ -101,6 +101,9 @@ def setup():
         description='Train a Document Reader model.'
     )
     # system
+
+    parser.add_argument('--logfile', type=str, default='log.txt',
+                        help='logfile name')
     parser.add_argument('--log_per_updates', type=int, default=3,
                         help='log model loss per x updates (mini-batches).')
     parser.add_argument('--data_file', default='SQuAD/data.msgpack',
@@ -115,9 +118,9 @@ def setup():
                         const=True, default=torch.cuda.is_available(),
                         help='whether to use GPU acceleration.')
     # training
-    parser.add_argument('-e', '--epochs', type=int, default=80)
-    parser.add_argument('-bs', '--batch_size', type=int, default=16)
-    parser.add_argument('-rs', '--resume', default='best_model.pt',
+    parser.add_argument('-e', '--epochs', type=int, default=150)
+    parser.add_argument('-bs', '--batch_size', type=int, default=32)
+    parser.add_argument('-rs', '--resume', default='best_model3.pt',
                         help='previous model file name (in `model_dir`). '
                              'e.g. "checkpoint_epoch_11.pt"')
     parser.add_argument('-ro', '--resume_options', action='store_true',
@@ -140,8 +143,8 @@ def setup():
                         help='perform rnn padding (much slower but more accurate).')
     # model
     parser.add_argument('--question_merge', default='self_attn')
-    parser.add_argument('--doc_layers', type=int, default=5)
-    parser.add_argument('--question_layers', type=int, default=5)
+    parser.add_argument('--doc_layers', type=int, default=4)
+    parser.add_argument('--question_layers', type=int, default=4)
     parser.add_argument('--hidden_size', type=int, default=128)
     parser.add_argument('--num_features', type=int, default=4)
     parser.add_argument('--pos', type=str2bool, nargs='?', const=True, default=True,
@@ -158,7 +161,10 @@ def setup():
     parser.add_argument('--max_len', type=int, default=15)
     parser.add_argument('--rnn_type', default='lstm',
                         help='supported types: sru')
-
+    parser.add_argument('--reduction_ratio', type=int, default=4,
+                        help='reduction_ratio')
+    parser.add_argument('--num_heads', type=int, default=4,
+                        help='The number of heads')
     args = parser.parse_args()
 
     # set model dir
@@ -166,7 +172,7 @@ def setup():
     os.makedirs(model_dir, exist_ok=True)
     args.model_dir = os.path.abspath(model_dir)
 
-    if args.resume == 'best_model.pt' and not os.path.exists(os.path.join(args.model_dir, args.resume)):
+    if args.resume == 'best_model3.pt' and not os.path.exists(os.path.join(args.model_dir, args.resume)):
         # means we're starting fresh
         args.resume = ''
 
@@ -191,7 +197,7 @@ def setup():
 
     log = logging.getLogger(__name__)
     log.setLevel(logging.DEBUG)
-    fh = logging.FileHandler(os.path.join(args.model_dir, 'log.txt'))
+    fh = logging.FileHandler(os.path.join(args.model_dir, args.logfile))
     fh.setLevel(logging.INFO)
     ch = ProgressHandler()
     ch.setLevel(logging.DEBUG)

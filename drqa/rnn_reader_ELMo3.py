@@ -5,8 +5,10 @@
 # of patent rights can be found in the PATENTS file in the same directory.
 import torch
 import torch.nn as nn
-from . import layers
+#from . import layers
 
+from drqa import layers2 as layers
+from drqa import multiAttentionRNN as custom
 # Modification:
 #   - add 'pos' and 'ner' features.
 #   - use gradient hook (instead of tensor copying) for gradient masking
@@ -56,41 +58,20 @@ class RnnDocReader(nn.Module):
             doc_input_size += opt['pos_size']
         if opt['ner']:
             doc_input_size += opt['ner_size']
+        question_input_size = opt['embedding_dim'] + 1024
 
         self.x1_ratio1 = torch.nn.Parameter(0.5 * torch.ones(1))
         self.x2_ratio1 = torch.nn.Parameter(0.5 * torch.ones(1))
-        #self.x1_ratio2 = torch.nn.Parameter(0.5 * torch.ones(1))
-        #self.x2_ratio2 = torch.nn.Parameter(0.5 * torch.ones(1))
 
-        # RNN document encoder
-        self.doc_rnn = layers.StackedBRNN(
-            input_size=doc_input_size,
-            hidden_size=opt['hidden_size'],
-            num_layers=opt['doc_layers'],
-            dropout_rate=opt['dropout_rnn'],
-            dropout_output=opt['dropout_rnn_output'],
-            concat_layers=opt['concat_rnn_layers'],
-            padding=opt['rnn_padding'],
-        )
-
-        # RNN question encoder
-        ques_input_size =opt['embedding_dim']+1024
-        self.question_rnn = layers.StackedBRNN(
-            input_size=ques_input_size,
-            hidden_size=opt['hidden_size'],
-            num_layers=opt['question_layers'],
-            dropout_rate=opt['dropout_rnn'],
-            dropout_output=opt['dropout_rnn_output'],
-            concat_layers=opt['concat_rnn_layers'],
-            padding=opt['rnn_padding'],
-        )
+        self.attention_rnns= custom.AttentionRNN(opt,
+                                                 doc_input_size=doc_input_size,
+                                                 question_input_size=question_input_size,
+                                                 ratio=opt['reduction_ratio'])
 
         # Output sizes of rnn encoders
-        doc_hidden_size = 2 * opt['hidden_size']
-        question_hidden_size = 2 * opt['hidden_size']
-        if opt['concat_rnn_layers']:
-            doc_hidden_size *= opt['doc_layers']
-            question_hidden_size *= opt['question_layers']
+        doc_hidden_size = 2 * opt['hidden_size'] +opt['hidden_size']//opt['reduction_ratio']
+        question_hidden_size =  2 * opt['hidden_size']+opt['hidden_size']//opt['reduction_ratio']
+
 
         # Question merging
         if opt['question_merge'] not in ['avg', 'self_attn']:
@@ -132,8 +113,8 @@ class RnnDocReader(nn.Module):
         x2 = question word indices             [batch * len_q]
         x2_mask = question padding mask        [batch * len_q]
         """
-        print(self.x1_ratio1.data)
-        print(self.x2_ratio1.data)
+        print(self.x1_ratio1.data.item())
+        print(self.x2_ratio1.data.item())
         # Embed both document and question
         x1_emb = self.embedding(x1)
         x2_emb = self.embedding(x2)
@@ -178,18 +159,10 @@ class RnnDocReader(nn.Module):
             drnn_input_list.append(x1_ner)
         drnn_input_list.append(x1_elmo_merged1)
         drnn_input = torch.cat(drnn_input_list, 2)
-        # Encode document with RNN
-        doc_hiddens = self.doc_rnn(drnn_input, x1_mask)
-
-        #x1_elmo_merged2 = self.x1_ratio2 * x1_elmo[1] + (1.0 - self.x1_ratio2) * x1_elmo[0]
-        #doc_hiddens = torch.cat([doc_hiddens,x1_elmo_merged2],dim=2)
-
-        # Encode question with RNN + merge hiddens
         qrnn_input_list = [x2_emb,x2_elmo_merged1]
         qrnn_input = torch.cat(qrnn_input_list,2)
-        question_hiddens = self.question_rnn(qrnn_input, x2_mask)
-        #x2_elmo_merged2 = self.x2_ratio2 * x2_elmo[1] + (1.0 - self.x2_ratio2) * x2_elmo[0]
-        #question_hiddens = torch.cat([question_hiddens,x2_elmo_merged2],dim=2)
+
+        doc_hiddens, question_hiddens = self.attention_rnns(drnn_input,x1_mask,qrnn_input,x2_mask)
 
         if self.opt['question_merge'] == 'avg':
             q_merge_weights = layers.uniform_weights(question_hiddens, x2_mask)
