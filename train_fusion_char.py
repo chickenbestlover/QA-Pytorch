@@ -148,7 +148,7 @@ def setup():
                         help='perform rnn padding (much slower but more accurate).')
     # model
 
-    parser.add_argument('--use_char', type=bool, default=True)
+    parser.add_argument('--use_char', type=bool, default=False)
     parser.add_argument('--MTLSTM_path', type=str, default='./drqa/cove/MT-LSTM.pth')
     parser.add_argument('--char_hidden_size', type=int, default=100)
     parser.add_argument('--hidden_size', type=int, default=100)

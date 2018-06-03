@@ -193,8 +193,8 @@ class RnnDocReader(nn.Module):
         x2_emb = Dropout(x2_emb, self.opt['dropout_emb'], self.training, device = self.device)
         x1_cove = Dropout(x1_cove, self.opt['dropout_emb'], self.training, device = self.device)
         x2_cove = Dropout(x2_cove, self.opt['dropout_emb'], self.training, device = self.device)
-        x1_pos_emb = nn.functional.dropout(x1_pos_emb, p=self.opt['dropout_emb'], training=self.training)
-        x1_ner_emb = nn.functional.dropout(x1_ner_emb, p=self.opt['dropout_emb'], training=self.training)
+        #x1_pos_emb = nn.functional.dropout(x1_pos_emb, p=self.opt['dropout_emb'], training=self.training)
+        #x1_ner_emb = nn.functional.dropout(x1_ner_emb, p=self.opt['dropout_emb'], training=self.training)
 
         word_attention_outputs = self.word_attention_layer(x1_emb, x1_mask, x2_emb, x2_mask, self.training)
         x1_word_input = torch.cat(
@@ -255,9 +255,9 @@ class RnnDocReader(nn.Module):
             logits2 = F.log_softmax(logits2,dim=1)
         else:
             # ...Otherwise 0-1 probabilities
+
             logits1 = F.softmax(logits1,dim=1)
             logits2 = F.softmax(logits2, dim=1)
-
         return logits1, logits2
 
 
