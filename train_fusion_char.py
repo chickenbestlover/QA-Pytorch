@@ -15,13 +15,21 @@ from drqa.model_ELMo_fusion import DocReaderModel
 from drqa.utils import str2bool
 from allennlp.modules.elmo import Elmo, batch_to_ids
 import os
+import ujson as json
+import numpy as np
 
 
 def main():
 
+    if not os.path.exists('train_model/') :
+        os.makedirs('train_model/')
+    if not os.path.exists('result/') :
+        os.makedirs('result/')
+
     args, log = setup()
     log.info('[Program starts. Loading data...]')
-    train, dev, dev_y, embedding, opt = load_data(vars(args))
+    #train, dev, dev_y, embedding, opt = load_data(vars(args))
+    train, dev, word2id, char2id, embedding, opt = load_data(vars(args))
     log.info(opt)
     log.info('[Data loaded.]')
 
@@ -43,12 +51,9 @@ def main():
         if args.reduce_lr:
             lr_decay(model.optimizer, lr_decay=args.reduce_lr)
             log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
-        batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
-        predictions = []
-        for i, batch in enumerate(batches):
-            predictions.extend(model.predict(batch))
-            log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
-        em, f1 = score(predictions, dev_y)
+        batches = BatchGen(dev, batch_size=args.batch_size)
+        em,f1= model.Evaluate(batches, args.data_path + 'dev_eval.json',
+                       answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
         log.info("[dev EM: {} F1: {}]".format(em, f1))
         if math.fabs(em - checkpoint['em']) > 1e-3 or math.fabs(f1 - checkpoint['f1']) > 1e-3:
             log.info('Inconsistent: recorded EM: {} F1: {}'.format(checkpoint['em'], checkpoint['f1']))
@@ -66,7 +71,7 @@ def main():
     for epoch in range(epoch_0, epoch_0 + args.epochs):
         log.warning('Epoch {}'.format(epoch))
         # train
-        batches = BatchGen(train, batch_size=args.batch_size, gpu=args.cuda)
+        batches = BatchGen(train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
         start = datetime.now()
 
         for i, batch in enumerate(batches):
@@ -75,15 +80,14 @@ def main():
                 log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
                     epoch, model.updates, model.train_loss.value,
                     str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
+
         log.debug('\n')
+
         # # eval
-        batches = BatchGen(dev, batch_size=args.batch_size, evaluation=True, gpu=args.cuda)
-        predictions = []
-        for i, batch in enumerate(batches):
-            predictions.extend(model.predict(batch))
-            log.debug('> evaluating [{}/{}]'.format(i, len(batches)))
-        em, f1 = score(predictions, dev_y)
-        log.warning("dev EM: {} F1: {}".format(em, f1))
+        batches = BatchGen(dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+        em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
+                                answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
+        log.info("[dev EM: {} F1: {}]".format(em, f1))
         # save
         model_file = os.path.join(args.model_dir, 'checkpoint_elmo_fusion.pt'.format(epoch))
         model.save(model_file, epoch, [em, f1, best_val_score])
@@ -105,15 +109,14 @@ def setup():
     )
     # system
 
-    parser.add_argument('--logfile', type=str, default='log_elmo_fusion.txt',
+    parser.add_argument('--data_path', default='./SQuAD_fusion/')
+    parser.add_argument('--logfile', type=str, default='log_fusion.txt',
                         help='logfile name')
     parser.add_argument('--log_per_updates', type=int, default=3,
                         help='log model loss per x updates (mini-batches).')
-    parser.add_argument('--data_file', default='SQuAD/data.msgpack',
-                        help='path to preprocessed data file.')
     parser.add_argument('--model_dir', default='models',
                         help='path to store saved models.')
-    parser.add_argument('--seed', type=int, default=1013,
+    parser.add_argument('--seed', type=int, default=1,
                         help='random seed for data shuffling, dropout, etc.')
     parser.add_argument("--cuda", type=str2bool, nargs='?',
                         const=True, default=torch.cuda.is_available(),
@@ -151,10 +154,9 @@ def setup():
     parser.add_argument('--hidden_size', type=int, default=100)
     parser.add_argument('--attention_size', type=int, default=250)
     parser.add_argument('--num_features', type=int, default=4)
-    parser.add_argument('--pos', type=str2bool, nargs='?', const=True, default=True,
-                        help='use pos tags as a feature.')
-    parser.add_argument('--ner', type=str2bool, nargs='?', const=True, default=True,
-                        help='use named entity tags as a feature.')
+    parser.add_argument('--char_dim', type=int, default=50)
+    parser.add_argument('--pos_dim', type=int, default=12)
+    parser.add_argument('--ner_dim', type=int, default=8)
     parser.add_argument('--dropout_emb', type=float, default=0.3)
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--max_len', type=int, default=15)
@@ -208,129 +210,174 @@ def lr_decay(optimizer, lr_decay):
         param_group['lr'] *= lr_decay
     return optimizer
 
+#
+# def load_data(opt):
+#     with open('SQuAD/meta.msgpack', 'rb') as f:
+#         meta = msgpack.load(f, encoding='utf8')
+#     embedding = torch.Tensor(meta['embedding'])
+#     opt['pretrained_words'] = True
+#     opt['vocab_size'] = embedding.size(0)
+#     opt['embedding_dim'] = embedding.size(1)
+#     opt['pos_size'] = len(meta['vocab_tag'])
+#     opt['ner_size'] = len(meta['vocab_ent'])
+#     BatchGen.pos_size = opt['pos_size']
+#     BatchGen.ner_size = opt['ner_size']
+#     with open(opt['data_file'], 'rb') as f:
+#         data = msgpack.load(f, encoding='utf8')
+#     train = data['train']
+#     data['dev'].sort(key=lambda x: len(x[1]))
+#     dev = [x[:8] + x[9:]for x in data['dev']]
+#     dev_y = [x[8] for x in data['dev']]
+#     return train, dev, dev_y, embedding, opt
+
+
+def get_data(filename) :
+    with open(filename, 'r', encoding='utf-8') as f :
+        data = json.load(f)
+    return data
 
 def load_data(opt):
-    with open('SQuAD/meta.msgpack', 'rb') as f:
-        meta = msgpack.load(f, encoding='utf8')
-    embedding = torch.Tensor(meta['embedding'])
-    opt['pretrained_words'] = True
-    opt['vocab_size'] = embedding.size(0)
-    opt['embedding_dim'] = embedding.size(1)
-    opt['pos_size'] = len(meta['vocab_tag'])
-    opt['ner_size'] = len(meta['vocab_ent'])
-    BatchGen.pos_size = opt['pos_size']
-    BatchGen.ner_size = opt['ner_size']
-    with open(opt['data_file'], 'rb') as f:
-        data = msgpack.load(f, encoding='utf8')
-    train = data['train']
-    data['dev'].sort(key=lambda x: len(x[1]))
-    dev = [x[:8] + x[9:]for x in data['dev']]
-    dev_y = [x[8] for x in data['dev']]
-    return train, dev, dev_y, embedding, opt
+    print('load data...')
+    data_path = opt['data_path']
+
+    train_data = get_data(data_path + 'train.json')
+    dev_data = get_data(data_path + 'dev.json')
+    word2id = get_data(data_path + 'word2id.json')
+    char2id = get_data(data_path + 'char2id.json')
+    pos2id = get_data(data_path + 'pos2id.json')
+    ner2id = get_data(data_path + 'ner2id.json')
+
+    opt['char_size'] = int(np.max(list(char2id.values())) + 1)
+    opt['pos_size'] = int(np.max(list(pos2id.values())) + 1)
+    opt['ner_size'] = int(np.max(list(ner2id.values())) + 1)
+
+    print('load embedding...')
+    word_emb = np.array(get_data(data_path + 'word_emb.json'), dtype=np.float32)
+    embedding = torch.from_numpy(word_emb)
+
+    return train_data, dev_data, word2id, char2id, embedding, opt
+
 
 
 class BatchGen:
-    pos_size = None
-    ner_size = None
-
-    def __init__(self, data, batch_size, gpu, evaluation=False):
+    def __init__(self, data, batch_size, device='cuda'):
         """
         input:
             data - list of lists
             batch_size - int
         """
-        self.batch_size = batch_size
-        self.eval = evaluation
-        self.gpu = gpu
-
         #options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
         #weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
         #self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to('cuda')
-
-        # sort by len
-        data = sorted(data, key=lambda x: len(x[1]))
-        # chunk into batches
-        data = [data[i:i + batch_size] for i in range(0, len(data), batch_size)]
-
-        # shuffle
-        if not evaluation:
-            random.shuffle(data)
-
+        self.batch_size = batch_size
         self.data = data
+        self.device = device
+
+    def compute_mask(self, x):
+        return torch.eq(x, 0).to(self.device)
 
     def __len__(self):
-        return len(self.data)
+        return len(self.data['context_ids'])//self.batch_size +1
 
     def __iter__(self):
-        for batch in self.data:
-            batch_size = len(batch)
-            batch = list(zip(*batch))
-            if self.eval:
-                assert len(batch) == 10
-            else:
-                assert len(batch) == 12
-
-            context_len = max(len(x) for x in batch[1])
-            context_id = torch.LongTensor(batch_size, context_len).fill_(0)
-            for i, doc in enumerate(batch[1]):
-                context_id[i, :len(doc)] = torch.LongTensor(doc)
-
-            feature_len = len(batch[2][0][0])
-
-            context_feature = torch.Tensor(batch_size, context_len, feature_len).fill_(0)
-            for i, doc in enumerate(batch[2]):
-                for j, feature in enumerate(doc):
-                    context_feature[i, j, :] = torch.Tensor(feature)
-
-            context_tag = torch.Tensor(batch_size, context_len, self.pos_size).fill_(0)
-            for i, doc in enumerate(batch[3]):
-                for j, tag in enumerate(doc):
-                    context_tag[i, j, tag] = 1
-
-            context_ent = torch.Tensor(batch_size, context_len, self.ner_size).fill_(0)
-            for i, doc in enumerate(batch[4]):
-                for j, ent in enumerate(doc):
-                    context_ent[i, j, ent] = 1
-
-            question_len = max(len(x) for x in batch[5])
-            question_id = torch.LongTensor(batch_size, question_len).fill_(0)
-            for i, doc in enumerate(batch[5]):
-                question_id[i, :len(doc)] = torch.LongTensor(doc)
-
-            context_mask = torch.eq(context_id, 0)
-            question_mask = torch.eq(question_id, 0)
-            text = list(batch[6])
-            span = list(batch[7])
-
-            context_text = list(batch[-2])
-            question_text = list(batch[-1])
-            context_elmo = batch_to_ids(context_text)
-            question_elmo = batch_to_ids(question_text)
-
-            if not self.eval:
-                y_s = torch.LongTensor(batch[8])
-                y_e = torch.LongTensor(batch[9])
-            if self.gpu:
-                context_id = context_id.pin_memory()
-                context_feature = context_feature.pin_memory()
-                context_tag = context_tag.pin_memory()
-                context_ent = context_ent.pin_memory()
-                context_mask = context_mask.pin_memory()
-                question_id = question_id.pin_memory()
-                question_mask = question_mask.pin_memory()
-                context_elmo = context_elmo.pin_memory().cuda()
-                question_elmo = question_elmo.pin_memory().cuda()
-
+        for i in range(0, len(self.data['context_ids']), self.batch_size):
             #context_elmo = self.elmo(context_elmo)['elmo_representations']
             #question_elmo = self.elmo(question_elmo)['elmo_representations']
+            batch_data = (self.data['context_ids'][i:i + self.batch_size],
+                          self.data['context_char_ids'][i:i + self.batch_size],
+                          self.data['context_pos_ids'][i:i + self.batch_size],
+                          self.data['context_ner_ids'][i:i + self.batch_size],
+                          self.data['context_match_origin'][i:i + self.batch_size],
+                          self.data['context_match_lower'][i:i + self.batch_size],
+                          self.data['context_match_lemma'][i:i + self.batch_size],
+                          self.data['context_tf'][i:i + self.batch_size],
+                          self.data['ques_ids'][i:i + self.batch_size],
+                          self.data['ques_char_ids'][i:i + self.batch_size],
+                          self.data['ques_pos_ids'][i:i + self.batch_size],
+                          self.data['ques_ner_ids'][i:i + self.batch_size],
+                          self.data['y1'][i:i + self.batch_size],
+                          self.data['y2'][i:i + self.batch_size],
+                          self.data['id'][i:i + self.batch_size])
+
+            """
+            batch_data[0] : passage_ids,
+            batch_data[1] : passage_char_ids,
+            batch_data[2] : passage_pos_ids,
+            batch_data[3] : passage_ner_ids,
+            batch_data[4] : passage_match_origin,
+            batch_data[5] : passage_match_lower,
+            batch_data[6] : passage_match_lemma,
+            batch_data[7] : passage_tf,
+            batch_data[8] : ques_ids,
+            batch_data[9] : ques_char_ids,
+            batch_data[10] : ques_pos_ids,
+            batch_data[11] : ques_ner_ids,
+            batch_data[12] : y1,
+            batch_data[13] : y2,
+            batch_data[14] : id
+            """
+
+            passage_ids = torch.LongTensor(batch_data[0]).to(self.device)
+            passage_char_ids = torch.LongTensor(batch_data[1]).to(self.device)
+            passage_pos_ids = torch.LongTensor(batch_data[2]).to(self.device)
+            passage_ner_ids = torch.LongTensor(batch_data[3]).to(self.device)
+            passage_match_origin = torch.FloatTensor(batch_data[4]).to(self.device)
+            passage_match_lower = torch.FloatTensor(batch_data[5]).to(self.device)
+            passage_match_lemma = torch.FloatTensor(batch_data[6]).to(self.device)
+            passage_tf = torch.FloatTensor(batch_data[7]).to(self.device)
 
 
-            if self.eval:
-                yield (context_id, context_feature, context_tag, context_ent, context_mask,
-                       question_id, question_mask, text, span, None, None)
-            else:
-                yield (context_id, context_feature, context_tag, context_ent, context_mask,
-                       question_id, question_mask, y_s, y_e, text, span, None, None)
+            ques_ids = torch.LongTensor(batch_data[8]).to(self.device)
+            ques_char_ids = torch.LongTensor(batch_data[9]).to(self.device)
+            ques_pos_ids = torch.LongTensor(batch_data[10]).to(self.device)
+            ques_ner_ids = torch.LongTensor(batch_data[11]).to(self.device)
+
+
+            y1 = torch.LongTensor(batch_data[12]).to(self.device)
+            y2 = torch.LongTensor(batch_data[13]).to(self.device)
+
+            p_lengths = passage_ids.ne(0).long().sum(1)
+            q_lengths = ques_ids.ne(0).long().sum(1)
+
+            passage_maxlen = int(torch.max(p_lengths, 0)[0])
+            ques_maxlen = int(torch.max(q_lengths, 0)[0])
+
+            passage_ids = passage_ids[:, :passage_maxlen]
+            passage_char_ids = passage_char_ids[:, :passage_maxlen]
+            passage_pos_ids = passage_pos_ids[:, :passage_maxlen]
+            passage_ner_ids = passage_ner_ids[:, :passage_maxlen]
+            passage_match_origin = passage_match_origin[:, :passage_maxlen]
+            passage_match_lower = passage_match_lower[:, :passage_maxlen]
+            passage_match_lemma = passage_match_lemma[:, :passage_maxlen]
+            passage_tf = passage_tf[:, :passage_maxlen]
+            ques_ids = ques_ids[:, :ques_maxlen]
+            ques_char_ids = ques_char_ids[:, :ques_maxlen]
+            ques_pos_ids = ques_pos_ids[:, :ques_maxlen]
+            ques_ner_ids = ques_ner_ids[:, :ques_maxlen]
+
+            p_mask = self.compute_mask(passage_ids)
+            q_mask = self.compute_mask(ques_ids)
+
+
+            yield (passage_ids,
+                   passage_char_ids,
+                   passage_pos_ids,
+                   passage_ner_ids,
+                   passage_match_origin.unsqueeze(2).float(),
+                   passage_match_lower.unsqueeze(2).float(),
+                   passage_match_lemma.unsqueeze(2).float(),
+                   passage_tf.unsqueeze(2),
+                   p_mask,
+                   ques_ids,
+                   ques_char_ids,
+                   ques_pos_ids,
+                   ques_ner_ids,
+                   q_mask,
+                   y1,
+                   y2,
+                   batch_data[14])
+
+
 
 
 def _normalize_answer(s):

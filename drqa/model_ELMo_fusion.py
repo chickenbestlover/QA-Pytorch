@@ -9,11 +9,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 import logging
-
+import ujson as json
 from torch.autograd import Variable
 from .utils import AverageMeter
 from .rnn_reader_ELMo_fusion import RnnDocReader
-
+from evaluation import evaluate
 #from .rnn_reader2 import RnnDocReader
 # Modification:
 #   - change the logger name
@@ -73,67 +73,127 @@ class DocReaderModel(object):
         print("{} parameters".format(num_params),'\n')
 
     def update(self, ex):
-        # Train mode
-        self.network.train()
+        with torch.enable_grad():
+            # Train mode
+            self.network.train()
 
-        # Transfer to GPU
-        inputs = [e.to(self.device) for e in ex[:7]]
-        target_s = ex[7].to(self.device)
-        target_e = ex[8].to(self.device)
-        inputs.extend([ex[11], ex[12]])
-        # Run forward
-        score_s, score_e = self.network(*inputs)
+            # Transfer to GPU
+            target_s = ex[14].to(self.device)
+            target_e = ex[15].to(self.device)
 
-        # Compute loss and accuracies
-        loss = F.nll_loss(score_s, target_s) + F.nll_loss(score_e, target_e)
-        self.train_loss.update(loss.item())
+            # Run forward
+            score_s, score_e = self.network(*ex[:15])
 
-        # Clear gradients and run backward
-        self.optimizer.zero_grad()
-        loss.backward()
+            # Compute loss and accuracies
+            loss = F.nll_loss(score_s, target_s) + F.nll_loss(score_e, target_e)
+            self.train_loss.update(loss.item())
 
-        # Clip gradients
-        torch.nn.utils.clip_grad_norm_(self.network.parameters(),
-                                      self.opt['grad_clipping'])
+            # Clear gradients and run backward
+            self.optimizer.zero_grad()
+            loss.backward()
 
-        # Update parameters
-        self.optimizer.step()
-        self.updates += 1
+            # Clip gradients
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(),
+                                          self.opt['grad_clipping'])
+
+            # Update parameters
+            self.optimizer.step()
+            self.updates += 1
 
 
-    def predict(self, ex):
-        # Eval mode
-        self.network.eval()
+    # def predict(self, ex):
+    #     # Eval mode
+    #     self.network.eval()
+    #
+    #     # Transfer to GPU
+    #     if self.opt['cuda']:
+    #         inputs = [e.cuda(async=True) for e in ex[:7]]
+    #     else:
+    #         inputs = [e for e in ex[:7]]
+    #     inputs.extend([ex[9], ex[10]])
+    #
+    #     # Run forward
+    #     with torch.no_grad():
+    #         score_s, score_e = self.network(*inputs)
+    #
+    #     # Transfer to CPU/normal tensors for numpy ops
+    #     score_s = score_s.data.cpu()
+    #     score_e = score_e.data.cpu()
+    #
+    #     # Get argmax text spans
+    #     text = ex[-4]
+    #     spans = ex[-3]
+    #     predictions = []
+    #     max_len = self.opt['max_len'] or score_s.size(1)
+    #     for i in range(score_s.size(0)):
+    #         scores = torch.ger(score_s[i], score_e[i])
+    #         scores.triu_().tril_(max_len - 1)
+    #         scores = scores.numpy()
+    #         s_idx, e_idx = np.unravel_index(np.argmax(scores), scores.shape)
+    #         s_offset, e_offset = spans[i][s_idx][0], spans[i][e_idx][1]
+    #         predictions.append(text[i][s_offset:e_offset])
+    #
+    #     return predictions
 
-        # Transfer to GPU
-        if self.opt['cuda']:
-            inputs = [e.cuda(async=True) for e in ex[:7]]
-        else:
-            inputs = [e for e in ex[:7]]
-        inputs.extend([ex[9], ex[10]])
 
-        # Run forward
-        with torch.no_grad():
-            score_s, score_e = self.network(*inputs)
+    def get_predictions(self, logits1, logits2, maxlen=15) :
+        batch_size, P = logits1.size()
+        outer = torch.matmul(F.softmax(logits1, -1).unsqueeze(2),
+                             F.softmax(logits2, -1).unsqueeze(1))
 
-        # Transfer to CPU/normal tensors for numpy ops
-        score_s = score_s.data.cpu()
-        score_e = score_e.data.cpu()
+        band_mask = Variable(torch.zeros(P, P)).to(self.device)
 
-        # Get argmax text spans
-        text = ex[-4]
-        spans = ex[-3]
-        predictions = []
-        max_len = self.opt['max_len'] or score_s.size(1)
-        for i in range(score_s.size(0)):
-            scores = torch.ger(score_s[i], score_e[i])
-            scores.triu_().tril_(max_len - 1)
-            scores = scores.numpy()
-            s_idx, e_idx = np.unravel_index(np.argmax(scores), scores.shape)
-            s_offset, e_offset = spans[i][s_idx][0], spans[i][e_idx][1]
-            predictions.append(text[i][s_offset:e_offset])
+        for i in range(P) :
+            band_mask[i, i:max(i+maxlen, P)].data.fill_(1.0)
 
-        return predictions
+        band_mask = band_mask.unsqueeze(0).repeat(batch_size, 1, 1)
+        outer = outer * band_mask
+
+        yp1 = torch.max(torch.max(outer, 2)[0], 1)[1]
+        yp2 = torch.max(torch.max(outer, 1)[0], 1)[1]
+
+        return yp1, yp2
+
+
+    def convert_tokens(self, eval_file, qa_id, pp1, pp2) :
+        answer_dict = {}
+        remapped_dict = {}
+        for qid, p1, p2 in zip(qa_id, pp1, pp2) :
+
+            p1 = int(p1)
+            p2 = int(p2)
+            context = eval_file[str(qid)]["context"]
+            spans = eval_file[str(qid)]["spans"]
+            uuid = eval_file[str(qid)]["uuid"]
+            start_idx = spans[p1][0]
+            end_idx = spans[p2][1]
+            answer_dict[str(qid)] = context[start_idx : end_idx]
+            remapped_dict[uuid] = context[start_idx : end_idx]
+        return answer_dict, remapped_dict
+
+    def Evaluate(self, batches, eval_file=None, answer_file = None) :
+        print ('Start evaluate...')
+
+        with open(eval_file, 'r') as f :
+            eval_file = json.load(f)
+
+        answer_dict = {}
+        remapped_dict = {}
+
+        for i,batch in enumerate(batches):
+            start_score,end_score = self.network.forward(*batch[:15])
+            y1, y2 = self.get_predictions(start_score,end_score )
+            qa_id = batch[16]
+            answer_dict_, remapped_dict_ = self.convert_tokens(eval_file, qa_id, y1, y2)
+            answer_dict.update(answer_dict_)
+            remapped_dict.update(remapped_dict_)
+            del y1, y2, answer_dict_, remapped_dict_
+            print('> evaluating [{}/{}]'.format(i, len(batches)))
+        metrics = evaluate(eval_file, answer_dict)
+        with open(answer_file, 'w') as f:
+            json.dump(remapped_dict, f)
+
+        return metrics['exact_match'], metrics['f1']
 
     def save(self, filename, epoch, scores):
         em, f1, best_eval = scores
@@ -158,3 +218,6 @@ class DocReaderModel(object):
             logger.info('model saved to {}'.format(filename))
         except BaseException:
             logger.warning('[ WARN: Saving failed... continuing anyway. ]')
+
+
+
