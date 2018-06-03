@@ -85,15 +85,14 @@ def main():
         em, f1 = score(predictions, dev_y)
         log.warning("dev EM: {} F1: {}".format(em, f1))
         # save
-        if not args.save_last_only or epoch == epoch_0 + args.epochs - 1:
-            model_file = os.path.join(args.model_dir, 'checkpoint_elmo_fusion.pt'.format(epoch))
-            model.save(model_file, epoch, [em, f1, best_val_score])
-            if f1 > best_val_score:
-                best_val_score = f1
-                copyfile(
-                    model_file,
-                    os.path.join(args.model_dir, 'best_model_elmo_fusion.pt'))
-                log.info('[new best model saved.]')
+        model_file = os.path.join(args.model_dir, 'checkpoint_elmo_fusion.pt'.format(epoch))
+        model.save(model_file, epoch, [em, f1, best_val_score])
+        if f1 > best_val_score:
+            best_val_score = f1
+            copyfile(
+                model_file,
+                os.path.join(args.model_dir, 'best_model_elmo_fusion.pt'))
+            log.info('[new best model saved.]')
 
         if epoch > 0 and epoch % args.decay_period == 0:
             model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
