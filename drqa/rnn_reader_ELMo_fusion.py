@@ -155,6 +155,9 @@ class RnnDocReader(nn.Module):
                                         device=self.device)
 
 
+    def reset_parameters(self) :
+        if not self.opt['fix_embedding'] :
+            self.word_embeddings.weight.data[self.fixed_idx] = self.fixed_embedding
 
     def forward(self, x1, x1_f, x1_pos, x1_ner, x1_mask, x2, x2_mask,x1_elmo=None,x2_elmo=None):
         """Inputs:
