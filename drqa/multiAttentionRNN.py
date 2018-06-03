@@ -42,6 +42,7 @@ class AttentionRNN(nn.Module):
             hidden_size=opt['hidden_size'],
             num_layers=1,
             dropout_rate=opt['dropout_rnn'],
+
             ))
             self.question_rnns.append(layers.StackedBRNN(
             input_size=question_input_size,
@@ -66,21 +67,21 @@ class AttentionRNN(nn.Module):
             #print(i,' x1',x1.size())
             #print(i,'x1_mask',x1_mask.size())
             x1 = self.doc_rnns[i](x1,x1_mask)
-            x1 = nn.functional.dropout(x1, p=self.dropout_rate,training=self.training)
+            #x1 = nn.functional.dropout(x1, p=self.dropout_rate,training=self.training)
             #print(i,' x1',x1.size())
             #print(i,' x2',x2.size())
             x2 = self.question_rnns[i](x2,x2_mask)
-            x2 = nn.functional.dropout(x2, p=self.dropout_rate,training=self.training)
+            #x2 = nn.functional.dropout(x2, p=self.dropout_rate,training=self.training)
             #q_merge_weights = self.question_self_attns[i](x2, x2_mask)
             #question_hidden = layers.weighted_avg(x2, q_merge_weights)
             matched_x2_hiddens = self.doc_attns[i](x1,x2,x2_mask)
             #matched_x2_hiddens = nn.functional.dropout(matched_x2_hiddens, p=self.dropout_rate, training=self.training)
             matched_x2_hiddens = self.doc_convs[i](matched_x2_hiddens)
-            #matched_x2_hiddens = nn.functional.dropout(matched_x2_hiddens, p=self.dropout_rate,training=self.training)
+            matched_x2_hiddens = nn.functional.dropout(matched_x2_hiddens, p=self.dropout_rate,training=self.training)
             matched_x1_hiddens = self.doc_attns[i](x2,x1,x1_mask)
             #matched_x1_hiddens = nn.functional.dropout(matched_x1_hiddens, p=self.dropout_rate,training=self.training)
             matched_x1_hiddens = self.doc_convs[i](matched_x1_hiddens)
-            #matched_x1_hiddens = nn.functional.dropout(matched_x1_hiddens, p=self.dropout_rate,training=self.training)
+            matched_x1_hiddens = nn.functional.dropout(matched_x1_hiddens, p=self.dropout_rate,training=self.training)
             #print(i,' hidden:',matched_x2_hiddens.size())
             #print(i,' x1:',x1.size())
             x1 = torch.cat([x1,matched_x2_hiddens],dim=2)

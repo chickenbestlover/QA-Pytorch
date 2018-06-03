@@ -28,7 +28,7 @@ class StackedBRNN(nn.Module):
         self.num_layers = num_layers
         self.concat_layers = concat_layers
         self.rnns = nn.ModuleList()
-        self.lns = nn.ModuleList()
+        #self.lns = nn.ModuleList()
         for i in range(num_layers):
             self.input_size = input_size if i == 0 else 2 * hidden_size+hidden_size//2
             #self.rnns.append(rnn_type(input_size, hidden_size,
@@ -37,9 +37,9 @@ class StackedBRNN(nn.Module):
             self.rnns.append(SRUCell(input_size, hidden_size,
                                      dropout=dropout_rate,  # dropout applied between RNN layers
                                      rnn_dropout=dropout_rate,  # variational dropout applied on linear transformation
-                                     use_tanh=0,  # use tanh?
+                                     use_tanh=1,  # use tanh?
                                      use_relu=0,  # use ReLU?
-                                     use_selu=1,  # use SeLU?
+                                     use_selu=0,  # use SeLU?
                                      bidirectional=True,  # bidirectional RNN ?
                                      weight_norm=False,  # apply weight normalization on parameters
                                      layer_norm=False,  # apply layer normalization on the output of each layer
@@ -47,7 +47,7 @@ class StackedBRNN(nn.Module):
                                      rescale=False
                                      ))
 
-            self.lns.append(LayerNorm(d_hid=2 * hidden_size))
+            #self.lns.append(LayerNorm(d_hid=2 * hidden_size))
 
     def forward(self, x, x_mask):
         """Can choose to either handle or ignore variable length sequences.
@@ -210,7 +210,7 @@ class multiSeqAttnMatch(nn.Module):
     * o_i = sum(alpha_j * y_j) for i in X
     * alpha_j = softmax(y_j * x_i)
     """
-    def __init__(self, input_size,n_head=4, identity=False):
+    def __init__(self, input_size,n_head=4):
         super(multiSeqAttnMatch, self).__init__()
 
         self.hidden_size = input_size // n_head
