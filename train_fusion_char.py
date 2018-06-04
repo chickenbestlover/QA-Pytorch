@@ -254,6 +254,7 @@ def load_data(opt):
     print('load embedding...')
     word_emb = np.array(get_data(data_path + 'word_emb.json'), dtype=np.float32)
     embedding = torch.from_numpy(word_emb)
+    del word_emb
 
     return train_data, dev_data, word2id, char2id, embedding, opt
 
@@ -336,6 +337,10 @@ class BatchGen:
             y1 = torch.LongTensor(batch_data[12]).to(self.device)
             y2 = torch.LongTensor(batch_data[13]).to(self.device)
 
+            id=batch_data[14]
+
+            del batch_data
+
             p_lengths = passage_ids.ne(0).long().sum(1)
             q_lengths = ques_ids.ne(0).long().sum(1)
 
@@ -375,7 +380,7 @@ class BatchGen:
                    q_mask,
                    y1,
                    y2,
-                   batch_data[14])
+                   id)
 
 
 

@@ -100,6 +100,7 @@ class DocReaderModel(object):
             self.optimizer.step()
             self.updates += 1
 
+            self.network.reset_parameters()
 
     # def predict(self, ex):
     #     # Eval mode
@@ -188,7 +189,7 @@ class DocReaderModel(object):
             answer_dict.update(answer_dict_)
             remapped_dict.update(remapped_dict_)
             del y1, y2, answer_dict_, remapped_dict_
-            print('> evaluating [{}/{}]'.format(i, len(batches)))
+            #print('> evaluating [{}/{}]'.format(i, len(batches)))
         metrics = evaluate(eval_file, answer_dict)
         with open(answer_file, 'w') as f:
             json.dump(remapped_dict, f)

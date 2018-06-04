@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from drqa.cove.cove import MTLSTM
 from drqa.cove.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet
-
+import pickle as pkl
 
 class RnnDocReader(nn.Module):
     def __init__(self, opt, embedding):
@@ -27,16 +27,13 @@ class RnnDocReader(nn.Module):
         if opt['fix_embeddings']:
             assert opt['tune_partial'] == 0
             self.embedding.weight.requires_grad = False
-        elif opt['tune_partial'] > 0:
-            assert opt['tune_partial'] + 2 < embedding.size(0)
-            offset = self.opt['tune_partial'] + 2
-
-            def embedding_hook(grad, offset=offset):
-                grad[offset:] = 0
-                return grad
-
-            self.embedding.weight.register_hook(embedding_hook)
-
+        else :
+            with open(opt['data_path'] + 'tune_word_idx.pkl', 'rb') as f :
+                tune_idx = pkl.load(f)
+            self.fixed_idx = list(set([i for i in range(self.embedding.weight.shape[0])]) - set(tune_idx))
+            fixed_embedding = self.embedding.weight.data[self.fixed_idx]
+            self.register_buffer('fixed_embedding', fixed_embedding)
+            self.fixed_embedding = fixed_embedding
 
         self.pos_embeddings = nn.Embedding(opt['pos_size'], opt['pos_dim'], padding_idx=0)
 
@@ -158,6 +155,10 @@ class RnnDocReader(nn.Module):
                                         device=self.device)
 
 
+    def reset_parameters(self) :
+        if not self.opt['fix_embeddings'] :
+            self.embedding.weight.data[self.fixed_idx] = self.fixed_embedding
+
     def forward(self, x1, x1_char, x1_pos, x1_ner, x1_origin, x1_lower, x1_lemma, x1_tf, x1_mask,
                 x2, x2_char, x2_pos, x2_ner, x2_mask, x1_elmo=None, x2_elmo=None):
 
@@ -253,11 +254,6 @@ class RnnDocReader(nn.Module):
             # In training we output log-softmax for NLL
             logits1 = F.log_softmax(logits1,dim=1)
             logits2 = F.log_softmax(logits2,dim=1)
-        else:
-            # ...Otherwise 0-1 probabilities
-
-            logits1 = F.softmax(logits1,dim=1)
-            logits2 = F.softmax(logits2, dim=1)
         return logits1, logits2
 
 
