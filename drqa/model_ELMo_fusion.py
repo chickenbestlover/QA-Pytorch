@@ -182,14 +182,16 @@ class DocReaderModel(object):
         remapped_dict = {}
 
         for i,batch in enumerate(batches):
-            start_score,end_score = self.network.forward(*batch[:15])
-            y1, y2 = self.get_predictions(start_score,end_score )
-            qa_id = batch[16]
-            answer_dict_, remapped_dict_ = self.convert_tokens(eval_file, qa_id, y1, y2)
-            answer_dict.update(answer_dict_)
-            remapped_dict.update(remapped_dict_)
-            del y1, y2, answer_dict_, remapped_dict_
-            #print('> evaluating [{}/{}]'.format(i, len(batches)))
+            with torch.no_grad():
+                self.network.eval()
+                start_score,end_score = self.network.forward(*batch[:15])
+                y1, y2 = self.get_predictions(start_score,end_score )
+                qa_id = batch[16]
+                answer_dict_, remapped_dict_ = self.convert_tokens(eval_file, qa_id, y1, y2)
+                answer_dict.update(answer_dict_)
+                remapped_dict.update(remapped_dict_)
+                del y1, y2, answer_dict_, remapped_dict_
+                #print('> evaluating [{}/{}]'.format(i, len(batches)))
         metrics = evaluate(eval_file, answer_dict)
         with open(answer_file, 'w') as f:
             json.dump(remapped_dict, f)
