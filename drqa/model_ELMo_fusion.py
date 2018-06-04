@@ -173,28 +173,26 @@ class DocReaderModel(object):
         return answer_dict, remapped_dict
 
     def Evaluate(self, batches, eval_file=None, answer_file = None) :
-        print ('Start evaluate...')
-
         with open(eval_file, 'r') as f :
+            print('Start evaluate...')
             eval_file = json.load(f)
+            answer_dict = {}
+            #remapped_dict = {}
 
-        answer_dict = {}
-        remapped_dict = {}
-
-        for i,batch in enumerate(batches):
-            with torch.no_grad():
-                self.network.eval()
-                start_score,end_score = self.network.forward(*batch[:15])
-                y1, y2 = self.get_predictions(start_score,end_score )
-                qa_id = batch[16]
-                answer_dict_, remapped_dict_ = self.convert_tokens(eval_file, qa_id, y1, y2)
-                answer_dict.update(answer_dict_)
-                remapped_dict.update(remapped_dict_)
-                del y1, y2, answer_dict_, remapped_dict_
-                #print('> evaluating [{}/{}]'.format(i, len(batches)))
-        metrics = evaluate(eval_file, answer_dict)
-        with open(answer_file, 'w') as f:
-            json.dump(remapped_dict, f)
+            for i,batch in enumerate(batches):
+                with torch.no_grad():
+                    self.network.eval()
+                    start_score,end_score = self.network.forward(*batch[:15])
+                    y1, y2 = self.get_predictions(start_score,end_score )
+                    qa_id = batch[16]
+                    answer_dict_, remapped_dict_ = self.convert_tokens(eval_file, qa_id, y1, y2)
+                    answer_dict.update(answer_dict_)
+                    #remapped_dict.update(remapped_dict_)
+                    del y1, y2, answer_dict_#, remapped_dict_
+                    #print('> evaluating [{}/{}]'.format(i, len(batches)))
+            metrics = evaluate(eval_file, answer_dict)
+            #with open(answer_file, 'w') as f:
+            #    json.dump(remapped_dict, f)
 
         return metrics['exact_match'], metrics['f1']
 
