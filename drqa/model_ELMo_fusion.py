@@ -85,7 +85,7 @@ class DocReaderModel(object):
             score_s, score_e = self.network(*ex[:15])
 
             # Compute loss and accuracies
-            loss = F.nll_loss(score_s, target_s) + F.nll_loss(score_e, target_e)
+            loss = F.cross_entropy(score_s, target_s) + F.cross_entropy(score_e, target_e)
             self.train_loss.update(loss.item())
 
             # Clear gradients and run backward

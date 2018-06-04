@@ -250,10 +250,7 @@ class RnnDocReader(nn.Module):
 
         ### Pointer Network ###
         logits1, logits2 = self.pointer_layer.forward(und_doc_states, x1_mask, init_states, self.training)
-        if self.training:
-            # In training we output log-softmax for NLL
-            logits1 = F.log_softmax(logits1,dim=1)
-            logits2 = F.log_softmax(logits2,dim=1)
+
         return logits1, logits2
 
 

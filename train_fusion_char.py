@@ -157,7 +157,7 @@ def setup():
     parser.add_argument('--char_dim', type=int, default=50)
     parser.add_argument('--pos_dim', type=int, default=12)
     parser.add_argument('--ner_dim', type=int, default=8)
-    parser.add_argument('--dropout_emb', type=float, default=0.3)
+    parser.add_argument('--dropout_emb', type=float, default=0.5)
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--max_len', type=int, default=15)
     args = parser.parse_args()
