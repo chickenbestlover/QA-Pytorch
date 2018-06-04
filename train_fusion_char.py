@@ -48,9 +48,9 @@ def main():
         torch.random.set_rng_state(checkpoint['torch_state'])
         if args.cuda:
             torch.cuda.set_rng_state(checkpoint['torch_cuda_state'])
-        if args.reduce_lr:
-            lr_decay(model.optimizer, lr_decay=args.reduce_lr)
-            log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
+        #if args.reduce_lr:
+        #    lr_decay(model.optimizer, lr_decay=args.reduce_lr)
+        #    log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
         batches = BatchGen(dev, batch_size=args.batch_size)
         em,f1= model.Evaluate(batches, args.data_path + 'dev_eval.json',
                        answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
@@ -58,7 +58,7 @@ def main():
         if math.fabs(em - checkpoint['em']) > 1e-3 or math.fabs(f1 - checkpoint['f1']) > 1e-3:
             log.info('Inconsistent: recorded EM: {} F1: {}'.format(checkpoint['em'], checkpoint['f1']))
             log.error('Error loading model: current code is inconsistent with code used to train the previous model.')
-            exit(1)
+            #exit(1)
         best_val_score = checkpoint['best_eval']
     else:
         model = DocReaderModel(opt, embedding)

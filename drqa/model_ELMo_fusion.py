@@ -174,7 +174,7 @@ class DocReaderModel(object):
 
     def Evaluate(self, batches, eval_file=None, answer_file = None) :
         with open(eval_file, 'r') as f :
-            print('Start evaluate...')
+            #print('Start evaluate...')
             eval_file = json.load(f)
             answer_dict = {}
             #remapped_dict = {}
