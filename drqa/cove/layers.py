@@ -21,13 +21,13 @@ class StackedLSTM(nn.Module) :
                                      batch_first=True,
                                      bidirectional=True))
 
-    def forward(self, x, is_training) :
+    def forward(self, x) :
 
         outputs = [x]
 
         for layer in range(self.num_layers) :
             inp = outputs[layer]
-            d_inp = Dropout(inp, self.dropout, is_training, device = self.device)
+            d_inp = Dropout(inp, self.dropout, self.training, device = self.device)
 
             out, _ = self.rnns[layer](d_inp)
             outputs.append(out)
@@ -54,11 +54,11 @@ class FullAttention(nn.Module) :
     def init_weights(self) :
         nn.init.xavier_uniform_(self.U.weight.data)
 
-    def forward(self, passage, p_mask, question, q_mask, rep, is_training):
+    def forward(self, passage, p_mask, question, q_mask, rep):
 
-        if is_training :
+        if self.training:
             keep_prob = 1.0 - self.dropout
-            drop_mask = Dropout(passage, self.dropout, is_training, return_mask=True, device = self.device)
+            drop_mask = Dropout(passage, self.dropout, self.training, return_mask=True, device = self.device)
             d_passage = torch.div(passage, keep_prob) * drop_mask
             d_ques = torch.div(question, keep_prob) * drop_mask
         else :
@@ -95,11 +95,11 @@ class WordAttention(nn.Module) :
         nn.init.xavier_uniform_(self.W.weight.data)
         self.W.bias.data.fill_(0.1)
 
-    def forward(self, passage, p_mask, question, q_mask, is_training):
+    def forward(self, passage, p_mask, question, q_mask):
 
-        if is_training :
+        if self.training:
             keep_prob = 1.0 - self.dropout
-            drop_mask = Dropout(passage, self.dropout, is_training, return_mask = True, device = self.device)
+            drop_mask = Dropout(passage, self.dropout, self.training, return_mask = True, device = self.device)
             d_passage = torch.div(passage, keep_prob) * drop_mask
             d_ques = torch.div(question, keep_prob) * drop_mask
         else :
@@ -132,9 +132,9 @@ class Summ(nn.Module) :
         nn.init.xavier_uniform_(self.w.weight.data)
         self.w.bias.data.fill_(0.1)
 
-    def forward(self, x, mask, is_training) :
+    def forward(self, x, mask) :
 
-        d_x = Dropout(x, self.dropout, is_training, device = self.device)
+        d_x = Dropout(x, self.dropout, self.training, device = self.device)
         beta = self.w(d_x).squeeze(2)
         beta.data.masked_fill_(mask.data, -float('inf'))
         beta = F.softmax(beta, 1)
@@ -161,18 +161,18 @@ class PointerNet(nn.Module) :
         nn.init.xavier_uniform_(self.W_e.weight.data)
         self.W_e.bias.data.fill_(0.1)
 
-    def forward(self, self_states, p_mask, init_states, is_training) :
+    def forward(self, self_states, p_mask, init_states) :
 
-        d_init_states = Dropout(init_states.unsqueeze(1), self.dropout, is_training, device = self.device).squeeze(1)
+        d_init_states = Dropout(init_states.unsqueeze(1), self.dropout, self.training, device = self.device).squeeze(1)
         P0 = self.W_s(d_init_states)
         logits1 = torch.bmm(P0.unsqueeze(1), self_states.transpose(2, 1)).squeeze(1)
         logits1.data.masked_fill_(p_mask.data, -float('inf'))
         P_s = F.softmax(logits1, 1)
 
         rnn_input = torch.bmm(P_s.unsqueeze(1), self_states).squeeze(1)
-        d_rnn_input = Dropout(rnn_input.unsqueeze(1), self.dropout, is_training, device = self.device).squeeze(1)
+        d_rnn_input = Dropout(rnn_input.unsqueeze(1), self.dropout, self.training, device = self.device).squeeze(1)
         end_states = self.rnn(d_rnn_input, init_states)
-        d_end_states = Dropout(end_states.unsqueeze(1), self.dropout, is_training, device = self.device).squeeze(1)
+        d_end_states = Dropout(end_states.unsqueeze(1), self.dropout, self.training, device = self.device).squeeze(1)
 
         P1 = self.W_e(d_end_states)
         logits2 = torch.bmm(P1.unsqueeze(1), self_states.transpose(2, 1)).squeeze(1)

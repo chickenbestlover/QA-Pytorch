@@ -197,7 +197,7 @@ class RnnDocReader(nn.Module):
         #x1_pos_emb = nn.functional.dropout(x1_pos_emb, p=self.opt['dropout_emb'], training=self.training)
         #x1_ner_emb = nn.functional.dropout(x1_ner_emb, p=self.opt['dropout_emb'], training=self.training)
 
-        word_attention_outputs = self.word_attention_layer(x1_emb, x1_mask, x2_emb, x2_mask, self.training)
+        word_attention_outputs = self.word_attention_layer.forward(x1_emb, x1_mask, x2_emb, x2_mask)
         x1_word_input = torch.cat(
             [x1_emb, x1_cove, x1_pos_emb, x1_ner_emb, x1_tf, word_attention_outputs, x1_origin, x1_lower, x1_lemma], dim=2)
         x2_word_input = torch.cat([x2_emb, x2_cove, x2_pos_emb, x2_ner_emb], dim=2)
@@ -207,14 +207,14 @@ class RnnDocReader(nn.Module):
             x2_word_input = torch.cat([x2_word_input, x2_char_states], dim=2)
 
         ### low, high, understanding encoding ###
-        low_x1_states = self.low_doc_rnn(x1_word_input, self.training)
-        low_x2_states = self.low_ques_rnn(x2_word_input, self.training)
+        low_x1_states = self.low_doc_rnn.forward(x1_word_input)
+        low_x2_states = self.low_ques_rnn.forward(x2_word_input)
 
-        high_x1_states = self.high_doc_rnn(low_x1_states, self.training)
-        high_x2_states = self.high_ques_rnn(low_x2_states, self.training)
+        high_x1_states = self.high_doc_rnn.forward(low_x1_states)
+        high_x2_states = self.high_ques_rnn.forward(low_x2_states)
 
         und_x2_input = torch.cat([low_x2_states, high_x2_states], dim=2)
-        und_x2_states = self.und_ques_rnn(und_x2_input, self.training)
+        und_x2_states = self.und_ques_rnn.forward(und_x2_input)
 
         ########################################################################################
 
@@ -224,13 +224,13 @@ class RnnDocReader(nn.Module):
         x1_How = torch.cat([x1_emb, x1_cove, low_x1_states, high_x1_states], dim=2)
         x2_How = torch.cat([x2_emb, x2_cove, low_x2_states, high_x2_states], dim=2)
 
-        low_attention_outputs = self.low_attention_layer(x1_How, x1_mask, x2_How, x2_mask, low_x2_states, self.training)
-        high_attention_outputs = self.high_attention_layer(x1_How, x1_mask, x2_How, x2_mask, high_x2_states, self.training)
-        und_attention_outputs = self.und_attention_layer(x1_How, x1_mask, x2_How, x2_mask, und_x2_states, self.training)
+        low_attention_outputs = self.low_attention_layer.forward(x1_How, x1_mask, x2_How, x2_mask, low_x2_states)
+        high_attention_outputs = self.high_attention_layer.forward(x1_How, x1_mask, x2_How, x2_mask, high_x2_states)
+        und_attention_outputs = self.und_attention_layer.forward(x1_How, x1_mask, x2_How, x2_mask, und_x2_states)
 
         fuse_inp = torch.cat([low_x1_states, high_x1_states, low_attention_outputs, high_attention_outputs, und_attention_outputs], dim = 2)
 
-        fused_x1_states = self.fuse_rnn(fuse_inp, self.training)
+        fused_x1_states = self.fuse_rnn.forward(fuse_inp)
 
         ### Self Full Attention ###
 
@@ -239,17 +239,16 @@ class RnnDocReader(nn.Module):
                             low_attention_outputs, high_attention_outputs,
                             und_attention_outputs, fused_x1_states], dim=2)
 
-        self_attention_outputs = self.self_attention_layer(x1_How, x1_mask, x1_How, x1_mask, fused_x1_states, self.training)
+        self_attention_outputs = self.self_attention_layer.forward(x1_How, x1_mask, x1_How, x1_mask, fused_x1_states)
 
         self_inp = torch.cat([fused_x1_states, self_attention_outputs], dim=2)
 
-        und_doc_states = self.self_rnn(self_inp, self.training)
-
+        und_doc_states = self.self_rnn.forward(self_inp)
         ### ques summ vector ###
-        init_states = self.summ_layer(und_x2_states, x2_mask, self.training)
+        init_states = self.summ_layer.forward(und_x2_states, x2_mask)
 
         ### Pointer Network ###
-        logits1, logits2 = self.pointer_layer.forward(und_doc_states, x1_mask, init_states, self.training)
+        logits1, logits2 = self.pointer_layer.forward(und_doc_states, x1_mask, init_states)
 
         return logits1, logits2
 
