@@ -178,10 +178,9 @@ class DocReaderModel(object):
             eval_file = json.load(f)
             answer_dict = {}
             #remapped_dict = {}
-
-            for i,batch in enumerate(batches):
-                with torch.no_grad():
-                    self.network.eval()
+            with torch.no_grad():
+                self.network.eval()
+                for i,batch in enumerate(batches):
                     start_score,end_score = self.network.forward(*batch[:15])
                     y1, y2 = self.get_predictions(start_score,end_score )
                     qa_id = batch[16]
