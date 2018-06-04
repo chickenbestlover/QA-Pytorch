@@ -20,20 +20,30 @@ class RnnDocReader(nn.Module):
         super(RnnDocReader, self).__init__()
         # Store config
         self.opt = opt
+
+
         self.device = 'cuda' if opt['cuda'] else 'cpu'
 
         # Word embeddings
         self.embedding = nn.Embedding.from_pretrained(embedding, freeze=False)
         if opt['fix_embeddings']:
-            assert opt['tune_partial'] == 0
             self.embedding.weight.requires_grad = False
         else :
-            with open(opt['data_path'] + 'tune_word_idx.pkl', 'rb') as f :
-                tune_idx = pkl.load(f)
-            self.fixed_idx = list(set([i for i in range(self.embedding.weight.shape[0])]) - set(tune_idx))
-            fixed_embedding = self.embedding.weight.data[self.fixed_idx]
-            self.register_buffer('fixed_embedding', fixed_embedding)
-            self.fixed_embedding = fixed_embedding
+            pass
+            # with open(opt['data_path'] + 'tune_word_idx.pkl', 'rb') as f :
+            #     tune_idx = pkl.load(f)
+            # self.fixed_idx = list(set([i for i in range(self.embedding.weight.shape[0])]) - set(tune_idx))
+            # self.embedding.weight.data[self.fixed_idx].requires_grad=False
+            # def embedding_hook(grad, idx = self.fixed_idx):
+            #     grad[self.fixed_idx] = 0
+            #     return grad
+            #
+            # self.embedding.weight.register_hook(embedding_hook)
+            #
+            # fixed_embedding = self.embedding.weight.data[self.fixed_idx].to(self.device)
+            # fixed_embedding.requires_grad=False
+            # #self.register_buffer('fixed_embedding', fixed_embedding)
+            # self.fixed_embedding = fixed_embedding
 
         self.pos_embeddings = nn.Embedding(opt['pos_size'], opt['pos_dim'], padding_idx=0)
 

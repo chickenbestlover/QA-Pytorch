@@ -19,87 +19,6 @@ import ujson as json
 import numpy as np
 
 
-def main():
-
-    if not os.path.exists('train_model/') :
-        os.makedirs('train_model/')
-    if not os.path.exists('result/') :
-        os.makedirs('result/')
-
-    args, log = setup()
-    log.info('[Program starts. Loading data...]')
-    #train, dev, dev_y, embedding, opt = load_data(vars(args))
-    train, dev, word2id, char2id, embedding, opt = load_data(vars(args))
-    log.info(opt)
-    log.info('[Data loaded.]')
-
-    if args.resume:
-        log.info('[loading previous model...]')
-        checkpoint = torch.load(os.path.join(args.model_dir, args.resume))
-        if args.resume_options:
-            opt = checkpoint['config']
-        state_dict = checkpoint['state_dict']
-        model = DocReaderModel(opt, embedding, state_dict)
-
-
-        epoch_0 = checkpoint['epoch'] + 1
-        # synchronize random seed
-        random.setstate(checkpoint['random_state'])
-        torch.random.set_rng_state(checkpoint['torch_state'])
-        if args.cuda:
-            torch.cuda.set_rng_state(checkpoint['torch_cuda_state'])
-        #if args.reduce_lr:
-        #    lr_decay(model.optimizer, lr_decay=args.reduce_lr)
-        #    log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
-        batches = BatchGen(dev, batch_size=args.batch_size)
-        em,f1= model.Evaluate(batches, args.data_path + 'dev_eval.json',
-                       answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
-        log.info("[dev EM: {} F1: {}]".format(em, f1))
-        if math.fabs(em - checkpoint['em']) > 1e-3 or math.fabs(f1 - checkpoint['f1']) > 1e-3:
-            log.info('Inconsistent: recorded EM: {} F1: {}'.format(checkpoint['em'], checkpoint['f1']))
-            log.error('Error loading model: current code is inconsistent with code used to train the previous model.')
-            #exit(1)
-        best_val_score = checkpoint['best_eval']
-    else:
-        model = DocReaderModel(opt, embedding)
-        epoch_0 = 1
-        best_val_score = 0.0
-
-
-
-
-    for epoch in range(epoch_0, epoch_0 + args.epochs):
-        log.warning('Epoch {}'.format(epoch))
-        # train
-        batches = BatchGen(train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
-        start = datetime.now()
-
-        for i, batch in enumerate(batches):
-            model.update(batch)
-            if i % args.log_per_updates == 0:
-                log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
-                    epoch, model.updates, model.train_loss.value,
-                    str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
-
-        log.debug('\n')
-
-        # # eval
-        batches = BatchGen(dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
-        em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
-                                answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
-        log.info("[dev EM: {} F1: {}]".format(em, f1))
-        # save
-        model_file = os.path.join(args.model_dir, 'checkpoint_elmo_fusion.pt'.format(epoch))
-        model.save(model_file, epoch, [em, f1, best_val_score])
-        if f1 > best_val_score:
-            best_val_score = f1
-            copyfile(
-                model_file,
-                os.path.join(args.model_dir, 'best_model_elmo_fusion.pt'))
-            log.info('[new best model saved.]')
-
-        if epoch > 0 and epoch % args.decay_period == 0:
-            model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
 
 
 
@@ -157,7 +76,7 @@ def setup():
     parser.add_argument('--char_dim', type=int, default=50)
     parser.add_argument('--pos_dim', type=int, default=12)
     parser.add_argument('--ner_dim', type=int, default=8)
-    parser.add_argument('--dropout_emb', type=float, default=0.5)
+    parser.add_argument('--dropout_emb', type=float, default=0.3)
     parser.add_argument('--dropout', type=float, default=0.3)
     parser.add_argument('--max_len', type=int, default=15)
     args = parser.parse_args()
@@ -385,63 +304,82 @@ class BatchGen:
 
 
 
-def _normalize_answer(s):
-    def remove_articles(text):
-        return re.sub(r'\b(a|an|the)\b', ' ', text)
+if not os.path.exists('train_model/') :
+    os.makedirs('train_model/')
+if not os.path.exists('result/') :
+    os.makedirs('result/')
 
-    def white_space_fix(text):
-        return ' '.join(text.split())
+args, log = setup()
+log.info('[Program starts. Loading data...]')
+#train, dev, dev_y, embedding, opt = load_data(vars(args))
+train, dev, word2id, char2id, embedding, opt = load_data(vars(args))
+log.info(opt)
+log.info('[Data loaded.]')
 
-    def remove_punc(text):
-        exclude = set(string.punctuation)
-        return ''.join(ch for ch in text if ch not in exclude)
-
-    def lower(text):
-        return text.lower()
-
-    return white_space_fix(remove_articles(remove_punc(lower(s))))
-
-
-def _exact_match(pred, answers):
-    if pred is None or answers is None:
-        return False
-    pred = _normalize_answer(pred)
-    for a in answers:
-        if pred == _normalize_answer(a):
-            return True
-    return False
+if args.resume:
+    log.info('[loading previous model...]')
+    checkpoint = torch.load(os.path.join(args.model_dir, args.resume))
+    if args.resume_options:
+        opt = checkpoint['config']
+    state_dict = checkpoint['state_dict']
+    model = DocReaderModel(opt, embedding, state_dict)
 
 
-def _f1_score(pred, answers):
-    def _score(g_tokens, a_tokens):
-        common = Counter(g_tokens) & Counter(a_tokens)
-        num_same = sum(common.values())
-        if num_same == 0:
-            return 0
-        precision = 1. * num_same / len(g_tokens)
-        recall = 1. * num_same / len(a_tokens)
-        f1 = (2 * precision * recall) / (precision + recall)
-        return f1
-
-    if pred is None or answers is None:
-        return 0
-    g_tokens = _normalize_answer(pred).split()
-    scores = [_score(g_tokens, _normalize_answer(a).split()) for a in answers]
-    return max(scores)
-
-
-def score(pred, truth):
-    assert len(pred) == len(truth)
-    f1 = em = total = 0
-    for p, t in zip(pred, truth):
-        total += 1
-        em += _exact_match(p, t)
-        f1 += _f1_score(p, t)
-    em = 100. * em / total
-    f1 = 100. * f1 / total
-    return em, f1
+    epoch_0 = checkpoint['epoch'] + 1
+    # synchronize random seed
+    random.setstate(checkpoint['random_state'])
+    torch.random.set_rng_state(checkpoint['torch_state'])
+    if args.cuda:
+        torch.cuda.set_rng_state(checkpoint['torch_cuda_state'])
+    #if args.reduce_lr:
+    #    lr_decay(model.optimizer, lr_decay=args.reduce_lr)
+    #    log.info('[learning rate reduced by {}]'.format(args.reduce_lr))
+    batches = BatchGen(dev, batch_size=args.batch_size)
+    em,f1= model.Evaluate(batches, args.data_path + 'dev_eval.json',
+                   answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
+    log.info("[dev EM: {} F1: {}]".format(em, f1))
+    if math.fabs(em - checkpoint['em']) > 1e-3 or math.fabs(f1 - checkpoint['f1']) > 1e-3:
+        log.info('Inconsistent: recorded EM: {} F1: {}'.format(checkpoint['em'], checkpoint['f1']))
+        log.error('Error loading model: current code is inconsistent with code used to train the previous model.')
+        #exit(1)
+    best_val_score = checkpoint['best_eval']
+else:
+    model = DocReaderModel(opt, embedding)
+    epoch_0 = 1
+    best_val_score = 0.0
 
 
-if __name__ == '__main__':
-    main()
 
+
+for epoch in range(epoch_0, epoch_0 + args.epochs):
+    log.warning('Epoch {}'.format(epoch))
+    # train
+    batches = BatchGen(train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+    start = datetime.now()
+
+    for i, batch in enumerate(batches):
+        model.update(batch)
+        if i % args.log_per_updates == 0:
+            log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
+                epoch, model.updates, model.train_loss.value,
+                str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
+
+    log.debug('\n')
+
+    # # eval
+    batches = BatchGen(dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+    em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
+                            answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
+    log.info("[dev EM: {} F1: {}]".format(em, f1))
+    # save
+    model_file = os.path.join(args.model_dir, 'checkpoint_elmo_fusion.pt'.format(epoch))
+    model.save(model_file, epoch, [em, f1, best_val_score])
+    if f1 > best_val_score:
+        best_val_score = f1
+        copyfile(
+            model_file,
+            os.path.join(args.model_dir, 'best_model_elmo_fusion.pt'))
+        log.info('[new best model saved.]')
+
+    if epoch > 0 and epoch % args.decay_period == 0:
+        model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
