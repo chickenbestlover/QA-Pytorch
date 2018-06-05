@@ -383,3 +383,6 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
 
     if epoch > 0 and epoch % args.decay_period == 0:
         model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
+
+    if f1 > 83.0:
+        break
