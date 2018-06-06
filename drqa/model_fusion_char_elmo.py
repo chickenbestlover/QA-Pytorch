@@ -12,7 +12,7 @@ import logging
 import ujson as json
 from torch.autograd import Variable
 from .utils import AverageMeter
-from .rnn_reader_ELMo_fusion import RnnDocReader
+from .rnn_reader_fusion_char_elmo import RnnDocReader
 from evaluation import evaluate
 #from .rnn_reader2 import RnnDocReader
 # Modification:
