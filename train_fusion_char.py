@@ -301,7 +301,11 @@ class BatchGen:
                    y2,
                    id)
 
-
+def param_equility_check(model1,model2):
+    for p1, p2 in zip(model1.parameters(), model2.parameters()):
+        if p1.data.ne(p2.data).sum() > 0:
+            print(p1.size())
+    return True
 
 
 if not os.path.exists('train_model/') :
@@ -373,6 +377,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
     log.info("[dev EM: {} F1: {}]".format(em, f1))
     # save
     model_file = os.path.join(args.model_dir, 'checkpoint_elmo_fusion.pt'.format(epoch))
+
     model.save(model_file, epoch, [em, f1, best_val_score])
     if f1 > best_val_score:
         best_val_score = f1
@@ -381,8 +386,6 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
             os.path.join(args.model_dir, 'best_model_elmo_fusion.pt'))
         log.info('[new best model saved.]')
 
+
     if epoch > 0 and epoch % args.decay_period == 0:
         model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
-
-    if f1 > 83.0:
-        break

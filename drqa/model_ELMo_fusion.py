@@ -48,6 +48,7 @@ class DocReaderModel(object):
                 if k not in new_state:
                     del state_dict['network'][k]
             self.network.load_state_dict(state_dict['network'])
+            self.network.embedding.weight.data = state_dict['network']['embedding.weight'].data
         self.network.to(self.device)
 
         # Building optimizer.
