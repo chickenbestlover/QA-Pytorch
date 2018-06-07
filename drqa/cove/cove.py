@@ -15,7 +15,7 @@ class MTLSTM(nn.Module):
         super(MTLSTM, self).__init__()
 
         if embedding is not None:
-            self.embedding = nn.Embedding.from_pretrained(embedding, freeze=False)
+            self.embedding = nn.Embedding.from_pretrained(embedding, freeze=True)
         else:
             self.embedding = nn.Embedding(opt['vocab_size'], opt['embedding_dim'], padding_idx=padding_idx)
 

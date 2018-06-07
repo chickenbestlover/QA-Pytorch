@@ -355,8 +355,10 @@ if __name__ == '__main__' :
     word_counter, char_counter = Counter(), Counter()
     pos_counter, ner_counter = Counter(), Counter()
 
-    train_examples, train_eval = process_file('SQuAD_fusion/train-v1.1.json', "train", word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
-    dev_examples, dev_eval = process_file('SQuAD_fusion/dev-v1.1.json', "dev", word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
+    train_examples, train_eval = process_file('SQuAD_fusion/train-v1.1.json', "train",
+                                              word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
+    dev_examples, dev_eval = process_file('SQuAD_fusion/dev-v1.1.json', "dev",
+                                          word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
 
     pos2id = make_dict(pos_counter)
     ner2id = make_dict(ner_counter)

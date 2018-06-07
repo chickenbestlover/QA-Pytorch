@@ -136,9 +136,19 @@ def process_file(filename, data_type, word_counter, char_counter, pos_counter, n
                         y1s.append(y1)
                         y2s.append(y2)
 
-                    example = {"context_tokens": context_tokens, "context_chars": context_chars, "match_origin" : match_origin, "match_lower" : match_lower, "match_lemma" : match_lemma, "context_pos" : context_tags, "context_ner" : context_ents, "context_tf" : context_tf,
-                               "ques_tokens": ques_tokens, "ques_pos" : ques_tags, "ques_ner" : ques_ents,
-                               "ques_chars": ques_chars, "y1s": y1s, "y2s": y2s, "id": total}
+                    example = {"context_tokens": context_tokens,
+                               "context_chars": context_chars,
+                               "match_origin" : match_origin,
+                               "match_lower" : match_lower,
+                               "match_lemma" : match_lemma,
+                               "context_pos" : context_tags,
+                               "context_ner" : context_ents,
+                               "context_tf" : context_tf,
+                               "ques_tokens": ques_tokens,
+                               "ques_pos" : ques_tags,
+                               "ques_ner" : ques_ents,
+                               "ques_chars": ques_chars,
+                               "y1s": y1s, "y2s": y2s, "id": total}
                     examples.append(example)
                     eval_examples[str(total)] = {
                         "context": context, "spans": spans, "answers": answer_texts, "uuid": qa["id"]}
@@ -360,67 +370,70 @@ def build_features(examples, data_type, out_file, word2idx_dict, char2idx_dict, 
         json.dump(data, f)
 
 
-ques_word_counter = Counter()
-word_counter, char_counter = Counter(), Counter()
-pos_counter, ner_counter = Counter(), Counter()
-
-train_examples, train_eval = process_file('SQuAD_fusion/train-v1.1.json', "train", word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
-dev_examples, dev_eval = process_file('SQuAD_fusion/dev-v1.1.json', "dev", word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
-
-pos2id = make_dict(pos_counter)
-ner2id = make_dict(ner_counter)
-
-word_emb_file = 'glove/glove.840B.300d.txt'
-glove_word_size = int(2.2e6)
-glove_dim = 300
-word2id = None
-word_emb, word2id = get_embedding(word_counter, "word", emb_file = word_emb_file,
-                                  size = glove_word_size, vec_size = glove_dim,
-                                  token2idx_dict=word2id)
 
 
-char_emb_dim = 50
-char_size = 94
-char2id = None
-char_emb, char2id = get_embedding(char_counter, "char", size = char_size, vec_size = char_emb_dim,
-                                  token2idx_dict=char2id)
+if __name__ == '__main__' :
+    ques_word_counter = Counter()
+    word_counter, char_counter = Counter(), Counter()
+    pos_counter, ner_counter = Counter(), Counter()
 
-build_features(train_examples, "train",
-               'SQuAD_fusion/train_elmo.json', word2id, char2id, pos2id, ner2id)
-build_features(dev_examples, "dev",
-               'SQuAD_fusion/dev_elmo.json', word2id, char2id, pos2id, ner2id)
+    train_examples, train_eval = process_file('SQuAD_fusion/train-v1.1.json', "train", word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
+    dev_examples, dev_eval = process_file('SQuAD_fusion/dev-v1.1.json', "dev", word_counter, char_counter, pos_counter, ner_counter, ques_word_counter)
+
+    pos2id = make_dict(pos_counter)
+    ner2id = make_dict(ner_counter)
+
+    word_emb_file = 'glove/glove.840B.300d.txt'
+    glove_word_size = int(2.2e6)
+    glove_dim = 300
+    word2id = None
+    word_emb, word2id = get_embedding(word_counter, "word", emb_file = word_emb_file,
+                                      size = glove_word_size, vec_size = glove_dim,
+                                      token2idx_dict=word2id)
 
 
-with open('SQuAD_fusion/ques_word_counter.pkl', 'wb') as f :
-    pkl.dump(ques_word_counter.most_common(), f)
+    char_emb_dim = 50
+    char_size = 94
+    char2id = None
+    char_emb, char2id = get_embedding(char_counter, "char", size = char_size, vec_size = char_emb_dim,
+                                      token2idx_dict=char2id)
 
-tune_idx = []
-count = 0
-for i, (word, _) in enumerate(ques_word_counter.most_common()):
-    if word in word2id:
-        tune_idx.append(word2id[word])
-        count += 1
-    if count == 1000: break
+    build_features(train_examples, "train",
+                   'SQuAD_fusion/train_elmo.json', word2id, char2id, pos2id, ner2id)
+    build_features(dev_examples, "dev",
+                   'SQuAD_fusion/dev_elmo.json', word2id, char2id, pos2id, ner2id)
 
-with open('SQuAD_fusion/tune_word_idx.pkl', 'wb') as f:
-    pkl.dump(tune_idx, f)
 
-with open('SQuAD_fusion/train_eval.json', 'w', encoding='utf-8') as f :
-    json.dump(train_eval, f)
-with open('SQuAD_fusion/dev_eval.json', 'w', encoding='utf-8') as f :
-    json.dump(dev_eval, f)
+    with open('SQuAD_fusion/ques_word_counter.pkl', 'wb') as f :
+        pkl.dump(ques_word_counter.most_common(), f)
 
-with open('SQuAD_fusion/word_emb.json', 'w', encoding='utf-8') as f :
-    json.dump(word_emb, f)
+    tune_idx = []
+    count = 0
+    for i, (word, _) in enumerate(ques_word_counter.most_common()):
+        if word in word2id:
+            tune_idx.append(word2id[word])
+            count += 1
+        if count == 1000: break
 
-with open('SQuAD_fusionD/word2id.json', 'w', encoding='utf-8') as f :
-    json.dump(word2id, f)
+    with open('SQuAD_fusion/tune_word_idx.pkl', 'wb') as f:
+        pkl.dump(tune_idx, f)
 
-with open('SQuAD_fusion/char2id.json', 'w', encoding='utf-8') as f :
-    json.dump(char2id, f)
+    with open('SQuAD_fusion/train_eval.json', 'w', encoding='utf-8') as f :
+        json.dump(train_eval, f)
+    with open('SQuAD_fusion/dev_eval.json', 'w', encoding='utf-8') as f :
+        json.dump(dev_eval, f)
 
-with open('SQuAD_fusion/pos2id.json', 'w') as f :
-    json.dump(pos2id, f)
+    with open('SQuAD_fusion/word_emb.json', 'w', encoding='utf-8') as f :
+        json.dump(word_emb, f)
 
-with open('SQuAD_fusion/ner2id.json', 'w') as f :
-    json.dump(ner2id, f)
+    with open('SQuAD_fusionD/word2id.json', 'w', encoding='utf-8') as f :
+        json.dump(word2id, f)
+
+    with open('SQuAD_fusion/char2id.json', 'w', encoding='utf-8') as f :
+        json.dump(char2id, f)
+
+    with open('SQuAD_fusion/pos2id.json', 'w') as f :
+        json.dump(pos2id, f)
+
+    with open('SQuAD_fusion/ner2id.json', 'w') as f :
+        json.dump(ner2id, f)

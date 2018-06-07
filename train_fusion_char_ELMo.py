@@ -35,7 +35,7 @@ def setup():
                         help='log model loss per x updates (mini-batches).')
     parser.add_argument('--model_dir', default='models',
                         help='path to store saved models.')
-    parser.add_argument('--seed', type=int, default=1,
+    parser.add_argument('--seed', type=int, default=10,
                         help='random seed for data shuffling, dropout, etc.')
     parser.add_argument("--cuda", type=str2bool, nargs='?',
                         const=True, default=torch.cuda.is_available(),
@@ -63,11 +63,10 @@ def setup():
                         help='finetune top-x embeddings.')
     parser.add_argument('--fix_embeddings', action='store_true',
                         help='if true, `tune_partial` will be ignored.')
-    parser.add_argument('--rnn_padding', action='store_true',
-                        help='perform rnn padding (much slower but more accurate).')
     # model
-
-    parser.add_argument('--use_char', type=bool, default=False)
+    parser.add_argument('--use_char', action='store_true')
+    parser.add_argument('--use_cove', action='store_true')
+    parser.add_argument('--use_elmo', action='store_true')
     parser.add_argument('--MTLSTM_path', type=str, default='./drqa/cove/MT-LSTM.pth')
     parser.add_argument('--char_hidden_size', type=int, default=100)
     parser.add_argument('--hidden_size', type=int, default=100)
@@ -301,6 +300,7 @@ if not os.path.exists('result/') :
 args, log = setup()
 log.info('[Program starts. Loading data...]')
 train, dev, word2id, char2id, embedding, opt = load_data(vars(args))
+del word2id, char2id
 log.info(opt)
 log.info('[Data loaded.]')
 
@@ -311,8 +311,6 @@ if args.resume:
         opt = checkpoint['config']
     state_dict = checkpoint['state_dict']
     model = DocReaderModel(opt, embedding, state_dict)
-
-
     epoch_0 = checkpoint['epoch'] + 1
     # synchronize random seed
     random.setstate(checkpoint['random_state'])
@@ -328,8 +326,10 @@ if args.resume:
         log.error('Error loading model: current code is inconsistent with code used to train the previous model.')
         #exit(1)
     best_val_score = checkpoint['best_eval']
+    del batches, state_dict, checkpoint, embedding
 else:
     model = DocReaderModel(opt, embedding)
+    del embedding
     epoch_0 = 1
     best_val_score = 0.0
 
@@ -338,36 +338,47 @@ else:
 
 for epoch in range(epoch_0, epoch_0 + args.epochs):
     log.warning('Epoch {}'.format(epoch))
+
     # train
     batches = BatchGen(train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
     start = datetime.now()
-
     for i, batch in enumerate(batches):
         model.update(batch)
         if i % args.log_per_updates == 0:
             log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
                 epoch, model.updates, model.train_loss.value,
                 str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
-
     log.debug('\n')
     del batches
+
     # # eval
     batches = BatchGen(dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
     em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
                             answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
     log.info("[dev EM: {} F1: {}]".format(em, f1))
+    log.debug('\n')
     del batches
-    # save
-    model_file = os.path.join(args.model_dir, 'checkpoint_fusion_char_elmo.pt'.format(epoch))
 
+    # save
+    model_file = os.path.join(args.model_dir,
+                              'checkpoint_fusion'+
+                              '_char'+str(opt['use_char'])+
+                              '_cove'+str(opt['use_cove'])+
+                              '_elmo'+str(opt['use_elmo'])+
+                              '.pt')
     model.save(model_file, epoch, [em, f1, best_val_score])
     if f1 > best_val_score:
         best_val_score = f1
         copyfile(
             model_file,
-            os.path.join(args.model_dir, 'fusion_char_elmo.pt'))
+            os.path.join(args.model_dir,
+                         'fusion'+
+                         '_char'+str(opt['use_char'])+
+                         '_cove'+str(opt['use_cove'])+
+                         '_elmo'+str(opt['use_elmo'])+
+                         '.pt'))
+
         log.info('[new best model saved.]')
-
-
     if epoch > 0 and epoch % args.decay_period == 0:
         model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
+        log.info('> learning rate decayed by 0.5')
