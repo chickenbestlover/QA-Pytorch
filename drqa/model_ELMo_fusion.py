@@ -73,6 +73,7 @@ class DocReaderModel(object):
                          if p.data.data_ptr() != self.network.embedding.weight.data.data_ptr())
         print("{} parameters".format(num_params),'\n')
 
+
     def update(self, ex):
         with torch.enable_grad():
             # Train mode
@@ -102,40 +103,6 @@ class DocReaderModel(object):
             self.updates += 1
 
             self.network.reset_parameters()
-
-    # def predict(self, ex):
-    #     # Eval mode
-    #     self.network.eval()
-    #
-    #     # Transfer to GPU
-    #     if self.opt['cuda']:
-    #         inputs = [e.cuda(async=True) for e in ex[:7]]
-    #     else:
-    #         inputs = [e for e in ex[:7]]
-    #     inputs.extend([ex[9], ex[10]])
-    #
-    #     # Run forward
-    #     with torch.no_grad():
-    #         score_s, score_e = self.network(*inputs)
-    #
-    #     # Transfer to CPU/normal tensors for numpy ops
-    #     score_s = score_s.data.cpu()
-    #     score_e = score_e.data.cpu()
-    #
-    #     # Get argmax text spans
-    #     text = ex[-4]
-    #     spans = ex[-3]
-    #     predictions = []
-    #     max_len = self.opt['max_len'] or score_s.size(1)
-    #     for i in range(score_s.size(0)):
-    #         scores = torch.ger(score_s[i], score_e[i])
-    #         scores.triu_().tril_(max_len - 1)
-    #         scores = scores.numpy()
-    #         s_idx, e_idx = np.unravel_index(np.argmax(scores), scores.shape)
-    #         s_offset, e_offset = spans[i][s_idx][0], spans[i][e_idx][1]
-    #         predictions.append(text[i][s_offset:e_offset])
-    #
-    #     return predictions
 
 
     def get_predictions(self, logits1, logits2, maxlen=15) :
