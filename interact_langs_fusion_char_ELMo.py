@@ -19,11 +19,11 @@ from collections import Counter
 
 class Inference(object):
 
-    def __init__(self, opt, device='cuda'):
+    def __init__(self, opt):
+        self.device = 'cuda' if opt['cuda'] else 'cpu'
         self.char_limit = 16
         self.para_limit = 1000
         self.ques_limit = 100
-        self.device = device
         self.opt=opt
         self.word2idx_dict = self.get_data(args.data_path + 'word2id.json')
         self.char2idx_dict = self.get_data(args.data_path + 'char2id.json')
@@ -33,7 +33,7 @@ class Inference(object):
                        "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
         weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/" \
                       "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
-        self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to(device)
+        self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to(self.device)
 
         self.model = DocReaderModel(opt, embedding=None, state_dict=state_dict)
 
@@ -307,15 +307,7 @@ opt['cuda']=args.cuda
 print(opt)
 print('[Data loaded.] \n')
 
-context = "In meteorology, precipitation is any product of the condensation " \
-          "of atmospheric water vapor that falls under gravity. The main forms " \
-          "of precipitation include drizzle, rain, sleet, snow, graupel and hail." \
-          "Precipitation forms as smaller droplets coalesce via collision with other " \
-          "rain drops or ice crystals within a cloud. Short, intense periods of rain " \
-          "in scattered locations are called “showers”."
-question = "What causes precipitation to fall?"
-
-infer = Inference(opt, device='cuda' if args.cuda else 'cpu')
+infer = Inference(opt)
 
 while True:
 
@@ -366,5 +358,11 @@ while True:
     print(colored('Answer  : ','green'),'{}'.format(prediction),'\n')
 
 
-
+sample_context = "In meteorology, precipitation is any product of the condensation " \
+                 "of atmospheric water vapor that falls under gravity. The main forms " \
+                 "of precipitation include drizzle, rain, sleet, snow, graupel and hail." \
+                 "Precipitation forms as smaller droplets coalesce via collision with other " \
+                 "rain drops or ice crystals within a cloud. Short, intense periods of rain " \
+                 "in scattered locations are called “showers”."
+sample_question = "What causes precipitation to fall?"
 
