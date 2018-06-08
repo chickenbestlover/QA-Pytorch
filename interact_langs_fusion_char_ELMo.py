@@ -303,6 +303,7 @@ state_dict = checkpoint['state_dict']
 opt = checkpoint['config']
 opt['vocab_size']=90968
 opt['embedding_dim']=300
+opt['cuda']=args.cuda
 print(opt)
 print('[Data loaded.] \n')
 
