@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from drqa.cove.cove import MTLSTM
 from drqa.cove.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet
 import pickle as pkl
+from allennlp.modules.elmo import Elmo
 
 class RnnDocReader(nn.Module):
     def __init__(self, opt, embedding):
@@ -39,7 +40,7 @@ class RnnDocReader(nn.Module):
             self.fixed_idx = list(set([i for i in range(self.embedding.weight.shape[0])]) - set(tune_idx))
             self.embedding.weight.data[self.fixed_idx].requires_grad=False
             def embedding_hook(grad, idx = self.fixed_idx):
-                grad[self.fixed_idx] = 0
+                grad[idx] = 0
                 return grad
 
             self.embedding.weight.register_hook(embedding_hook)
@@ -48,6 +49,14 @@ class RnnDocReader(nn.Module):
             fixed_embedding.requires_grad=False
             #self.register_buffer('fixed_embedding', fixed_embedding)
             self.fixed_embedding = fixed_embedding
+
+        if self.opt['use_elmo']:
+            weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/" \
+                          "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
+            options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/" \
+                           "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
+            self.elmo = Elmo(options_file, weight_file, 3, dropout=0)
+
 
         self.pos_embeddings = nn.Embedding(opt['pos_size'], opt['pos_dim'], padding_idx=0)
 
@@ -185,28 +194,31 @@ class RnnDocReader(nn.Module):
     def forward(self, x1, x1_char, x1_pos, x1_ner, x1_origin, x1_lower, x1_lemma, x1_tf, x1_mask,
                 x2, x2_char, x2_pos, x2_ner, x2_mask, x1_elmo=None, x2_elmo=None):
 
-        ### character ###
 
+        ### GloVe ###
+        x1_glove_emb = self.embedding(x1)
+        x2_glove_emb = self.embedding(x2)
+
+        ### character ###
         if self.opt['use_char'] :
             passage_char_emb = self.char_embeddings(x1_char.contiguous().view(-1, x1_char.size(2)))
             ques_char_emb = self.char_embeddings(x2_char.contiguous().view(-1, x2_char.size(2)))
-
             d_passage_char_emb = Dropout(passage_char_emb, self.opt['dropout'], self.training, device= self.device)
             d_ques_char_emb = Dropout(ques_char_emb, self.opt['dropout'], self.training, device = self.device)
-
             _, (h, c) = self.char_rnn(d_passage_char_emb)
             x1_char_states = torch.cat([h[0], h[1]], dim=1).contiguous().view(-1, x1.size(1), 2*self.opt['char_hidden_size'])
             _, (h, c) = self.char_rnn(d_ques_char_emb)
             x2_char_states = torch.cat([h[0], h[1]], dim=1).contiguous().view(-1, x2.size(1), 2*self.opt['char_hidden_size'])
 
-        ### GloVe ###
-        x1_emb = self.embedding(x1)
-        x2_emb = self.embedding(x2)
-
         ### CoVe ###
         if self.opt['use_cove']:
-            _, x1_cove = self.cove_rnn(x1, x1_mask)
-            _, x2_cove = self.cove_rnn(x2, x2_mask)
+            _, x1_cove_emb = self.cove_rnn(x1, x1_mask)
+            _, x2_cove_emb = self.cove_rnn(x2, x2_mask)
+
+        ### ELMo ###
+        if self.opt['use_elmo']:
+            x1_elmo_embs = self.elmo(x1_elmo)['elmo_representations']
+            x2_elmo_embs = self.elmo(x2_elmo)['elmo_representations']
 
         ### embeddings ###
         x1_pos_emb = self.pos_embeddings(x1_pos)
@@ -215,29 +227,30 @@ class RnnDocReader(nn.Module):
         x2_ner_emb = self.ner_embeddings(x2_ner)
 
         ### embedding dropout ###
-        x1_emb = Dropout(x1_emb, self.opt['dropout_emb'], self.training, device = self.device)
-        x2_emb = Dropout(x2_emb, self.opt['dropout_emb'], self.training, device = self.device)
+        x1_glove_emb = Dropout(x1_glove_emb, self.opt['dropout_emb'], self.training, device = self.device)
+        x2_glove_emb = Dropout(x2_glove_emb, self.opt['dropout_emb'], self.training, device = self.device)
         if self.opt['use_cove']:
-            x1_cove = Dropout(x1_cove, self.opt['dropout_emb'], self.training, device = self.device)
-            x2_cove = Dropout(x2_cove, self.opt['dropout_emb'], self.training, device = self.device)
+            x1_cove_emb = Dropout(x1_cove_emb, self.opt['dropout_emb'], self.training, device = self.device)
+            x2_cove_emb = Dropout(x2_cove_emb, self.opt['dropout_emb'], self.training, device = self.device)
         if self.opt['use_elmo']:
-            x1_elmo = Dropout(x1_elmo, self.opt['dropout_emb'], self.training, device = self.device)
-            x2_elmo = Dropout(x2_elmo, self.opt['dropout_emb'], self.training, device = self.device)
-        word_attention_outputs = self.word_attention_layer.forward(x1_emb, x1_mask, x2_emb, x2_mask)
+            for i in range(len(x1_elmo_embs)):
+                x1_elmo_embs[i] = Dropout(x1_elmo_embs[i], self.opt['dropout_emb'], self.training, device = self.device)
+                x2_elmo_embs[i] = Dropout(x2_elmo_embs[i], self.opt['dropout_emb'], self.training, device = self.device)
+        word_attention_outputs = self.word_attention_layer.forward(x1_glove_emb, x1_mask, x2_glove_emb, x2_mask)
 
         x1_word_input = torch.cat(
-            [x1_emb, x1_pos_emb, x1_ner_emb, x1_tf, word_attention_outputs, x1_origin, x1_lower, x1_lemma], dim=2)
-        x2_word_input = torch.cat([x2_emb, x2_pos_emb, x2_ner_emb], dim=2)
+            [x1_glove_emb, x1_pos_emb, x1_ner_emb, x1_tf, word_attention_outputs, x1_origin, x1_lower, x1_lemma], dim=2)
+        x2_word_input = torch.cat([x2_glove_emb, x2_pos_emb, x2_ner_emb], dim=2)
 
         if self.opt['use_char'] :
             x1_word_input = torch.cat([x1_word_input, x1_char_states], dim=2)
             x2_word_input = torch.cat([x2_word_input, x2_char_states], dim=2)
         if self.opt['use_cove']:
-            x1_word_input = torch.cat([x1_word_input, x1_cove], dim=2)
-            x2_word_input = torch.cat([x2_word_input, x2_cove], dim=2)
+            x1_word_input = torch.cat([x1_word_input, x1_cove_emb], dim=2)
+            x2_word_input = torch.cat([x2_word_input, x2_cove_emb], dim=2)
         if self.opt['use_elmo']:
-            x1_word_input = torch.cat([x1_word_input, x1_elmo], dim=2)
-            x2_word_input = torch.cat([x2_word_input, x2_elmo], dim=2)
+            x1_word_input = torch.cat([x1_word_input, x1_elmo_embs[0]], dim=2)
+            x2_word_input = torch.cat([x2_word_input, x2_elmo_embs[0]], dim=2)
 
         ### low, high, understanding encoding ###
         low_x1_states = self.low_doc_rnn.forward(x1_word_input)
@@ -254,14 +267,14 @@ class RnnDocReader(nn.Module):
 
         ### Full Attention ###
 
-        x1_How = torch.cat([x1_emb, low_x1_states, high_x1_states], dim=2)
-        x2_How = torch.cat([x2_emb, low_x2_states, high_x2_states], dim=2)
+        x1_How = torch.cat([x1_glove_emb, low_x1_states, high_x1_states], dim=2)
+        x2_How = torch.cat([x2_glove_emb, low_x2_states, high_x2_states], dim=2)
         if self.opt['use_cove']:
-            x1_How = torch.cat([x1_How, x1_cove], dim=2)
-            x2_How = torch.cat([x2_How, x2_cove], dim=2)
+            x1_How = torch.cat([x1_How, x1_cove_emb], dim=2)
+            x2_How = torch.cat([x2_How, x2_cove_emb], dim=2)
         if self.opt['use_elmo']:
-            x1_How = torch.cat([x1_How, x1_elmo], dim=2)
-            x2_How = torch.cat([x2_How, x2_elmo], dim=2)
+            x1_How = torch.cat([x1_How, x1_elmo_embs[1]], dim=2)
+            x2_How = torch.cat([x2_How, x2_elmo_embs[1]], dim=2)
 
         low_attention_outputs = self.low_attention_layer.forward(x1_How, x1_mask, x2_How, x2_mask, low_x2_states)
         high_attention_outputs = self.high_attention_layer.forward(x1_How, x1_mask, x2_How, x2_mask, high_x2_states)
@@ -273,14 +286,14 @@ class RnnDocReader(nn.Module):
 
         ### Self Full Attention ###
 
-        x1_How = torch.cat([x1_emb, x1_pos_emb, x1_ner_emb, x1_tf,
+        x1_How = torch.cat([x1_glove_emb, x1_pos_emb, x1_ner_emb, x1_tf,
                             low_x1_states, high_x1_states,
                             low_attention_outputs, high_attention_outputs,
                             und_attention_outputs, fused_x1_states], dim=2)
         if self.opt['use_cove']:
-            x1_How = torch.cat([x1_How, x1_cove], dim=2)
+            x1_How = torch.cat([x1_How, x1_cove_emb], dim=2)
         if self.opt['use_elmo']:
-            x1_How = torch.cat([x1_How, x1_elmo], dim=2)
+            x1_How = torch.cat([x1_How, x1_elmo_embs[2]], dim=2)
 
         self_attention_outputs = self.self_attention_layer.forward(x1_How, x1_mask, x1_How, x1_mask, fused_x1_states)
 

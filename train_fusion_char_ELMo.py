@@ -13,7 +13,7 @@ import torch
 import msgpack
 from drqa.model_fusion_char_elmo import DocReaderModel
 from drqa.utils import str2bool
-from allennlp.modules.elmo import Elmo, batch_to_ids
+from allennlp.modules.elmo import batch_to_ids
 import os
 import ujson as json
 import numpy as np
@@ -43,7 +43,7 @@ def setup():
     # training
     parser.add_argument('-e', '--epochs', type=int, default=150)
     parser.add_argument('-bs', '--batch_size', type=int, default=32)
-    parser.add_argument('-rs', '--resume', default='best_model_elmo_fusion.pt',
+    parser.add_argument('-rs', '--resume', default='best_model.pt',
                         help='previous model file name (in `model_dir`). '
                              'e.g. "checkpoint_epoch_11.pt"')
     parser.add_argument('-ro', '--resume_options', action='store_true',
@@ -159,18 +159,17 @@ def load_data(opt):
 
 
 class BatchGen:
-    def __init__(self, data, batch_size, device='cuda'):
+    def __init__(self,opt, data, batch_size, device='cuda'):
         """
         input:
             data - list of lists
             batch_size - int
         """
-        options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
-        weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
-        self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to(device)
+
         self.batch_size = batch_size
         self.data = data
         self.device = device
+        self.opt = opt
 
     def compute_mask(self, x):
         return torch.eq(x, 0).to(self.device)
@@ -237,8 +236,13 @@ class BatchGen:
 
             id=batch_data[14]
 
-            passage_elmo_ids = batch_to_ids(batch_data[15]).to(self.device)
-            question_elmo_ids = batch_to_ids(batch_data[16]).to(self.device)
+            if self.opt['use_elmo']:
+                passage_elmo_ids = batch_to_ids(batch_data[15]).to(self.device)
+                question_elmo_ids = batch_to_ids(batch_data[16]).to(self.device)
+            else:
+                passage_elmo_ids = None
+                question_elmo_ids = None
+
             del batch_data
 
             p_lengths = passage_ids.ne(0).long().sum(1)
@@ -262,8 +266,7 @@ class BatchGen:
 
             p_mask = self.compute_mask(passage_ids)
             q_mask = self.compute_mask(ques_ids)
-            passage_elmo = self.elmo(passage_elmo_ids)['elmo_representations'][0]
-            question_elmo = self.elmo(question_elmo_ids)['elmo_representations'][0]
+
 
             yield (passage_ids,
                    passage_char_ids,
@@ -279,8 +282,8 @@ class BatchGen:
                    ques_pos_ids,
                    ques_ner_ids,
                    q_mask,
-                   passage_elmo,
-                   question_elmo,
+                   passage_elmo_ids,
+                   question_elmo_ids,
                    y1,
                    y2,
                    id)
@@ -317,7 +320,7 @@ if args.resume:
     torch.random.set_rng_state(checkpoint['torch_state'])
     if args.cuda:
         torch.cuda.set_rng_state(checkpoint['torch_cuda_state'])
-    batches = BatchGen(dev, batch_size=args.batch_size)
+    batches = BatchGen(opt, dev, batch_size=args.batch_size)
     em,f1= model.Evaluate(batches, args.data_path + 'dev_eval.json',
                    answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
     log.info("[dev EM: {} F1: {}]".format(em, f1))
@@ -340,7 +343,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
     log.warning('Epoch {}'.format(epoch))
 
     # train
-    batches = BatchGen(train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+    batches = BatchGen(opt, train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
     start = datetime.now()
     for i, batch in enumerate(batches):
         model.update(batch)
@@ -352,11 +355,11 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
     del batches
 
     # # eval
-    batches = BatchGen(dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+    batches = BatchGen(opt, dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
     em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
                             answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
-    log.info("[dev EM: {} F1: {}]".format(em, f1))
-    log.debug('\n')
+    log.info("[dev EM: {} F1: {}] \n".format(em, f1))
+    #log.debug('\n')
     del batches
 
     # save
@@ -365,6 +368,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                               '_char'+str(opt['use_char'])+
                               '_cove'+str(opt['use_cove'])+
                               '_elmo'+str(opt['use_elmo'])+
+                              '_hidden'+str(opt['hidden_size'])+
                               '.pt')
     model.save(model_file, epoch, [em, f1, best_val_score])
     if f1 > best_val_score:
@@ -376,9 +380,10 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                          '_char'+str(opt['use_char'])+
                          '_cove'+str(opt['use_cove'])+
                          '_elmo'+str(opt['use_elmo'])+
+                         '_hidden' + str(opt['hidden_size']) +
                          '.pt'))
 
-        log.info('[new best model saved.]')
+        log.info('[new best model saved.] \n')
     if epoch > 0 and epoch % args.decay_period == 0:
         model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
-        log.info('> learning rate decayed by 0.5')
+        log.info('> learning rate decayed by 0.5 \n')

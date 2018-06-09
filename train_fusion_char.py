@@ -48,7 +48,7 @@ def setup():
                              'e.g. "checkpoint_epoch_11.pt"')
     parser.add_argument('-ro', '--resume_options', action='store_true',
                         help='use previous model options, ignore the cli and defaults.')
-    parser.add_argument('--decay_period', type=int, default=15)
+    parser.add_argument('--decay_period', type=int, default=20)
     parser.add_argument('-rlr', '--reduce_lr', type=float, default=0.5,
                         help='reduce initial (resumed) learning rate by this factor.')
     parser.add_argument('-op', '--optimizer', default='adamax',
