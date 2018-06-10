@@ -11,14 +11,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from drqa.cove.cove import MTLSTM
-from drqa.cove.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet
+from qa.cove.cove import MTLSTM
+from qa.cove.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
-class RnnDocReader(nn.Module):
+class ReaderNet(nn.Module):
     def __init__(self, opt, embedding):
-        super(RnnDocReader, self).__init__()
+        super(ReaderNet, self).__init__()
         # Store config
         self.opt = opt
 

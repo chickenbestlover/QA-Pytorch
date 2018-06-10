@@ -7,13 +7,12 @@ import random
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-import numpy as np
 import logging
 import ujson as json
 from torch.autograd import Variable
 from .utils import AverageMeter
-from .rnn_reader_ELMo_fusion import RnnDocReader
-from evaluation import evaluate
+from .network import ReaderNet
+from qa.evaluation import evaluate
 #from .rnn_reader2 import RnnDocReader
 # Modification:
 #   - change the logger name
@@ -26,7 +25,7 @@ from evaluation import evaluate
 logger = logging.getLogger(__name__)
 
 
-class DocReaderModel(object):
+class QAModel(object):
     """High level model that handles intializing the underlying network
     architecture, saving, updating examples, and predicting examples.
     """
@@ -41,7 +40,7 @@ class DocReaderModel(object):
             self.train_loss.load(state_dict['loss'])
 
         # Building network.
-        self.network = RnnDocReader(opt, embedding=embedding)
+        self.network = ReaderNet(opt, embedding=embedding)
         if state_dict:
             new_state = set(self.network.state_dict().keys())
             for k in list(state_dict['network'].keys()):
@@ -80,11 +79,11 @@ class DocReaderModel(object):
             self.network.train()
 
             # Transfer to GPU
-            target_s = ex[14].to(self.device)
-            target_e = ex[15].to(self.device)
+            target_s = ex[-3].to(self.device)
+            target_e = ex[-2].to(self.device)
 
             # Run forward
-            score_s, score_e = self.network(*ex[:15])
+            score_s, score_e = self.network(*ex[:-3])
 
             # Compute loss and accuracies
             loss = F.cross_entropy(score_s, target_s) + F.cross_entropy(score_e, target_e)
@@ -149,9 +148,9 @@ class DocReaderModel(object):
             with torch.no_grad():
                 self.network.eval()
                 for i,batch in enumerate(batches):
-                    start_score,end_score = self.network.forward(*batch[:15])
+                    start_score,end_score = self.network.forward(*batch[:-3])
                     y1, y2 = self.get_predictions(start_score,end_score )
-                    qa_id = batch[16]
+                    qa_id = batch[-1]
                     answer_dict_, remapped_dict_ = self.convert_tokens(eval_file, qa_id, y1, y2)
                     answer_dict.update(answer_dict_)
                     #remapped_dict.update(remapped_dict_)
