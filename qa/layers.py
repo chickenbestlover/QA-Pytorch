@@ -21,7 +21,7 @@ class SRU(nn.Module):
 
 class StackedLSTM(nn.Module) :
 
-    def __init__(self, input_size, hidden_size, num_layers, dropout, concat = False, device = 'cuda', rnn_type=nn.LSTM) :
+    def __init__(self, input_size, hidden_size, num_layers, dropout, dropout_rnn=0,concat = False, device = 'cuda', rnn_type=nn.LSTM) :
         super(StackedLSTM, self).__init__()
         self.device = device
         self.dropout = dropout
@@ -33,19 +33,19 @@ class StackedLSTM(nn.Module) :
             self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
                                      hidden_size = hidden_size,
                                      num_layers = 1,
-                                     dropout = 0,
+                                     dropout = dropout_rnn,
                                      batch_first=True,
                                      bidirectional=True))
 
     def forward(self, x) :
+        x = Dropout(x, self.dropout, self.training, device=self.device)
 
         outputs = [x]
 
         for layer in range(self.num_layers) :
             inp = outputs[layer]
-            d_inp = Dropout(inp, self.dropout, self.training, device = self.device)
 
-            out, _ = self.rnns[layer](d_inp)
+            out, _ = self.rnns[layer](inp)
             outputs.append(out)
 
         outputs = outputs[1:]

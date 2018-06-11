@@ -70,6 +70,7 @@ def setup():
     parser.add_argument('--ner_dim', type=int, default=8)
     parser.add_argument('--dropout_emb', type=float, default=0.4)
     parser.add_argument('--dropout', type=float, default=0.4)
+    parser.add_argument('--dropout_rnn',type=float,default=0)
     parser.add_argument('--max_len', type=int, default=15)
     args = parser.parse_args()
 
