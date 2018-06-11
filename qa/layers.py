@@ -15,10 +15,8 @@ class SRU(nn.Module):
                                  use_tanh=1,
                                  bidirectional=bidirectional)
     def forward(self, x):
-        x = x.transpose(0,1) # undo batch_first
-        out = self.sru.forward(x)
-        return out.transpose(0,1) # do batch_first
-
+        return self.sru.forward(x.transpose(0,1)).transpose(0,1)
+        
 class StackedLSTM(nn.Module) :
 
     def __init__(self, input_size, hidden_size, num_layers, dropout, concat = True, device = 'cuda', rnn_type=nn.LSTM) :
