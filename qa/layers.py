@@ -15,7 +15,12 @@ class SRU(nn.Module):
                                  use_tanh=1,
                                  bidirectional=bidirectional)
     def forward(self, x):
-        return self.sru.forward(x.transpose(0,1)).transpose(0,1)
+        for d  in x:
+            d.transpose_(0,1)
+        out = self.sru.forward(x)
+        for d in out:
+            d.transpose_(0,1)
+        return out
 
 class StackedLSTM(nn.Module) :
 
