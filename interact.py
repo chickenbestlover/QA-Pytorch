@@ -286,8 +286,8 @@ def translate(text,target='en',verbose=True):
 parser = argparse.ArgumentParser(
     description='inferene model.'
 )
-parser.add_argument('--data_path', default='./SQuAD_fusion/')
-parser.add_argument('--model_file', default='models/fusion_charTrue_coveFalse_elmoTrue.pt',
+parser.add_argument('--data_path', default='./SQuAD/')
+parser.add_argument('--model_file', default='models/best_model.pt',
                     help='path to model file')
 parser.add_argument("--cuda", type=str2bool, nargs='?',
                     const=True, default=torch.cuda.is_available(),
