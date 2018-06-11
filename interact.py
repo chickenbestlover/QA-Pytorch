@@ -1,8 +1,8 @@
 
 import argparse
 import torch
-from drqa.model_fusion_char_elmo import DocReaderModel
-from drqa.utils import str2bool
+from qa.model import QAModel
+from qa.utils import str2bool
 import urllib.request
 import time
 from allennlp.modules.elmo import Elmo, batch_to_ids
