@@ -357,6 +357,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                               '_cove'+str(opt['use_cove'])+
                               '_elmo'+str(opt['use_elmo'])+
                               '_hidden'+str(opt['hidden_size'])+
+                              '_' + str(opt['rnn_type']) + str(opt['num_layers'])+
                               '.pt')
     model.save(model_file, epoch, [em, f1, best_val_score])
     if f1 > best_val_score:
@@ -368,6 +369,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                          '_cove'+str(opt['use_cove'])+
                          '_elmo'+str(opt['use_elmo'])+
                          '_hidden' + str(opt['hidden_size']) +
+                         '_' + str(opt['rnn_type']) + str(opt['num_layers']) +
                          '.pt'))
 
         log.info('[new best model saved.] \n')
