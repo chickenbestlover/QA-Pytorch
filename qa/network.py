@@ -10,19 +10,17 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from qa.cove.cove import MTLSTM
-from qa.cove.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet
+from qa.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet, SRUCell
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
 class ReaderNet(nn.Module):
+    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN, 'sru': SRUCell}
     def __init__(self, opt, embedding):
         super(ReaderNet, self).__init__()
         # Store config
         self.opt = opt
-
-
         self.device = 'cuda' if opt['cuda'] else 'cpu'
 
         # Word embeddings
@@ -74,12 +72,12 @@ class ReaderNet(nn.Module):
 
         if self.opt['use_char']:
             self.char_embeddings = nn.Embedding(opt['char_size'], opt['char_dim'], padding_idx=0)
-            self.char_rnn = nn.LSTM(input_size = opt['char_dim'],
-                                    hidden_size = opt['char_hidden_size'],
-                                    batch_first = True,
-                                    bidirectional = True,
-                                    num_layers = 1,
-                                    dropout = 0)
+            self.char_rnn = self.RNN_TYPES[opt['rnn_type']](input_size = opt['char_dim'],
+                                                            hidden_size = opt['char_hidden_size'],
+                                                            batch_first = True,
+                                                            bidirectional = True,
+                                                            num_layers = 1,
+                                                            dropout = 0)
             doc_input_size += 2 * opt['char_hidden_size']
             question_input_size += 2 * opt['char_hidden_size']
         if self.opt['use_cove']:
@@ -99,13 +97,15 @@ class ReaderNet(nn.Module):
                                        hidden_size=opt['hidden_size'],
                                        num_layers=1,
                                        dropout=opt['dropout'],
-                                       device= self.device)
+                                       device= self.device,
+                                       rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         self.low_ques_rnn = StackedLSTM(input_size=question_input_size,
                                         hidden_size=opt['hidden_size'],
                                         num_layers=1,
                                         dropout=opt['dropout'],
-                                        device= self.device)
+                                        device= self.device,
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         # Output sizes of low rnn encoders
         high_doc_hidden_size = 2 * opt['hidden_size']
@@ -115,13 +115,15 @@ class ReaderNet(nn.Module):
                                         hidden_size=opt['hidden_size'],
                                         num_layers=1,
                                         dropout=opt['dropout'],
-                                        device= self.device)
+                                        device= self.device,
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         self.high_ques_rnn = StackedLSTM(input_size=high_ques_hidden_size,
                                          hidden_size=opt['hidden_size'],
                                          num_layers=1,
                                          dropout=opt['dropout'],
-                                         device= self.device)
+                                         device= self.device,
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         und_q_word_size = 2 * (2 * opt['hidden_size'])
 
@@ -129,7 +131,8 @@ class ReaderNet(nn.Module):
                                         hidden_size=opt['hidden_size'],
                                         num_layers=1,
                                         dropout=opt['dropout'],
-                                        device= self.device)
+                                        device= self.device,
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         attention_inp_size = opt['embedding_dim'] + 2 * (2 * opt['hidden_size'])
         if self.opt['use_cove']:
@@ -158,7 +161,8 @@ class ReaderNet(nn.Module):
                                     hidden_size = opt['hidden_size'],
                                     num_layers = 1,
                                     dropout = opt['dropout'],
-                                    device=self.device)
+                                    device=self.device,
+                                    rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         self_attention_inp_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']+ \
                                   6 * (2 * opt['hidden_size']) + 1
@@ -176,7 +180,8 @@ class ReaderNet(nn.Module):
                                     hidden_size = opt['hidden_size'],
                                     num_layers = 1,
                                     dropout = opt['dropout'],
-                                    device=self.device)
+                                    device=self.device,
+                                    rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         self.summ_layer = Summ(input_size=2 * opt['hidden_size'],
                                dropout=opt['dropout'],

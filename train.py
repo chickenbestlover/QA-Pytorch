@@ -55,6 +55,7 @@ def setup():
     parser.add_argument('--fix_embeddings', action='store_true',
                         help='if true, `tune_partial` will be ignored.')
     # model
+    parser.add_argument('--rnn_type', type=str, default='lstm')
     parser.add_argument('--use_char', action='store_true')
     parser.add_argument('--use_cove', action='store_true')
     parser.add_argument('--use_elmo', action='store_true')

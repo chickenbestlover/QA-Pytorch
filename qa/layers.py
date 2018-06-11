@@ -2,10 +2,27 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import cuda_functional as custom_nn
+
+
+
+class SRUCell(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout,bidirectional=True,batch_first=True):
+        super(SRUCell, self).__init__()
+        self.sru = custom_nn.SRUCell(n_in= input_size,
+                                     n_out=hidden_size,
+                                     dropout=dropout,
+                                     rnn_dropout=dropout,
+                                     use_tanh=1,
+                                     bidirectional=bidirectional)
+    def forward(self, x):
+        x = x.transpose(0,1) # undo batch_first
+        out = self.sru.forward(x)
+        return out.transpose(0,1) # do batch_first
 
 class StackedLSTM(nn.Module) :
 
-    def __init__(self, input_size, hidden_size, num_layers, dropout, concat = True, device = 'cuda') :
+    def __init__(self, input_size, hidden_size, num_layers, dropout, concat = True, device = 'cuda', rnn_type=nn.LSTM) :
         super(StackedLSTM, self).__init__()
         self.device = device
         self.dropout = dropout
@@ -14,13 +31,16 @@ class StackedLSTM(nn.Module) :
         self.rnns = nn.ModuleList()
 
         for layer in range(num_layers) :
-            self.rnns.append(nn.LSTM(input_size = input_size if layer == 0 else 2 * hidden_size,
+            self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
                                      hidden_size = hidden_size,
                                      num_layers = 1,
                                      dropout = 0,
                                      batch_first=True,
                                      bidirectional=True))
-
+            #self.rnns.append(SRUCell(input_size= input_size if layer == 0 else 2 * hidden_size,
+            #                         hidden_size=hidden_size,
+            #                         dropout=0,
+            #                         bidirectional=True))
     def forward(self, x) :
 
         outputs = [x]
