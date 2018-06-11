@@ -35,7 +35,7 @@ class Inference(object):
                       "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
         self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to(self.device)
 
-        self.model = DocReaderModel(opt, embedding=None, state_dict=state_dict)
+        self.model = QAModel(opt, embedding=None, state_dict=state_dict)
 
     def get_data(self,filename):
         with open(filename, 'r', encoding='utf-8') as f:
