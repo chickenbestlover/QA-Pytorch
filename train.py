@@ -326,53 +326,50 @@ else:
 
 
 for epoch in range(epoch_0, epoch_0 + args.epochs):
-    try:
-        log.warning('Epoch {}'.format(epoch))
 
-        # train
-        batches = BatchGen(opt, train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
-        start = datetime.now()
-        for i, batch in enumerate(batches):
-            model.update(batch)
-            if i % args.log_per_updates == 0:
-                log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
-                    epoch, model.updates, model.train_loss.value,
-                    str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
-        log.debug('\n')
-        del batches
+    log.warning('Epoch {}'.format(epoch))
 
-        # # eval
-        batches = BatchGen(opt, dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
-        em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
-                                answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
-        log.info("[dev EM: {} F1: {}] \n".format(em, f1))
-        #log.debug('\n')
-        del batches
+    # train
+    batches = BatchGen(opt, train, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+    start = datetime.now()
+    for i, batch in enumerate(batches):
+        model.update(batch)
+        if i % args.log_per_updates == 0:
+            log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
+                epoch, model.updates, model.train_loss.value,
+                str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
+    log.debug('\n')
+    del batches
 
-        # save
-        model_file = os.path.join(args.model_dir,
-                                  'checkpoint_'+
-                                  '_char'+str(opt['use_char'])+
-                                  '_cove'+str(opt['use_cove'])+
-                                  '_elmo'+str(opt['use_elmo'])+
-                                  '_hidden'+str(opt['hidden_size'])+
-                                  '.pt')
-        model.save(model_file, epoch, [em, f1, best_val_score])
-        if f1 > best_val_score:
-            best_val_score = f1
-            copyfile(
-                model_file,
-                os.path.join(args.model_dir,
-                             '_char'+str(opt['use_char'])+
-                             '_cove'+str(opt['use_cove'])+
-                             '_elmo'+str(opt['use_elmo'])+
-                             '_hidden' + str(opt['hidden_size']) +
-                             '.pt'))
+    # # eval
+    batches = BatchGen(opt, dev, batch_size=args.batch_size, device='cuda' if args.cuda else 'cpu')
+    em, f1 = model.Evaluate(batches, args.data_path + 'dev_eval.json',
+                            answer_file='result/' + args.model_dir.split('/')[-1] + '.answers')
+    log.info("[dev EM: {} F1: {}] \n".format(em, f1))
+    #log.debug('\n')
+    del batches
 
-            log.info('[new best model saved.] \n')
-        if epoch > 0 and epoch % args.decay_period == 0:
-            model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
-            log.info('> learning rate decayed by 0.5 \n')
-    except:
-        epoch-=1
-        continue
+    # save
+    model_file = os.path.join(args.model_dir,
+                              'checkpoint_'+
+                              '_char'+str(opt['use_char'])+
+                              '_cove'+str(opt['use_cove'])+
+                              '_elmo'+str(opt['use_elmo'])+
+                              '_hidden'+str(opt['hidden_size'])+
+                              '.pt')
+    model.save(model_file, epoch, [em, f1, best_val_score])
+    if f1 > best_val_score:
+        best_val_score = f1
+        copyfile(
+            model_file,
+            os.path.join(args.model_dir,
+                         '_char'+str(opt['use_char'])+
+                         '_cove'+str(opt['use_cove'])+
+                         '_elmo'+str(opt['use_elmo'])+
+                         '_hidden' + str(opt['hidden_size']) +
+                         '.pt'))
+
+        log.info('[new best model saved.] \n')
+    if epoch > 0 and epoch % args.decay_period == 0:
+        model.optimizer = lr_decay(model.optimizer,lr_decay= args.reduce_lr)
+        log.info('> learning rate decayed by 0.5 \n')
