@@ -4,17 +4,16 @@ import torch.nn.functional as F
 
 import cuda_functional as custom_nn
 
-
-
-class SRUCell(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout,bidirectional=True,batch_first=True):
-        super(SRUCell, self).__init__()
-        self.sru = custom_nn.SRUCell(n_in= input_size,
-                                     n_out=hidden_size,
-                                     dropout=dropout,
-                                     rnn_dropout=dropout,
-                                     use_tanh=1,
-                                     bidirectional=bidirectional)
+class SRU(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers,dropout,bidirectional=True,batch_first=True):
+        super(SRU, self).__init__()
+        self.sru = custom_nn.SRU(input_size= input_size,
+                                 hidden_size=hidden_size,
+                                 num_layers=num_layers,
+                                 dropout=dropout,
+                                 rnn_dropout=dropout,
+                                 use_tanh=1,
+                                 bidirectional=bidirectional)
     def forward(self, x):
         x = x.transpose(0,1) # undo batch_first
         out = self.sru.forward(x)

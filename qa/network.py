@@ -11,12 +11,12 @@
 import torch
 import torch.nn as nn
 from qa.cove.cove import MTLSTM
-from qa.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet, SRUCell
+from qa.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet, SRU
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
 class ReaderNet(nn.Module):
-    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN, 'sru': SRUCell}
+    RNN_TYPES = {'lstm': nn.LSTM, 'gru': nn.GRU, 'rnn': nn.RNN, 'sru': SRU}
     def __init__(self, opt, embedding):
         super(ReaderNet, self).__init__()
         # Store config
