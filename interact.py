@@ -304,6 +304,7 @@ opt = checkpoint['config']
 opt['vocab_size']=90968
 opt['embedding_dim']=300
 opt['cuda']=args.cuda
+opt['data_path']=args.data_path
 print(opt)
 print('[Data loaded.] \n')
 
