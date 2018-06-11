@@ -13,7 +13,8 @@ class SRU(nn.Module):
                                  dropout=dropout,
                                  rnn_dropout=dropout,
                                  use_tanh=1,
-                                 bidirectional=bidirectional)
+                                 bidirectional=bidirectional,
+                                 rescale=False)
     def forward(self, x):
         out, c  = self.sru.forward(x.transpose(0,1))
         return out.transpose(0,1), c.transpose(0,1)
@@ -35,10 +36,7 @@ class StackedLSTM(nn.Module) :
                                      dropout = 0,
                                      batch_first=True,
                                      bidirectional=True))
-            # self.rnns.append(SRU(input_size= input_size if layer == 0 else 2 * hidden_size,
-            #                          hidden_size=hidden_size,
-            #                          dropout=0,
-            #                          bidirectional=True))
+
     def forward(self, x) :
 
         outputs = [x]
