@@ -95,14 +95,14 @@ class ReaderNet(nn.Module):
 
         self.low_doc_rnn = StackedLSTM(input_size=doc_input_size,
                                        hidden_size=opt['hidden_size'],
-                                       num_layers=1,
+                                       num_layers=opt['num_layers'],
                                        dropout=opt['dropout'],
                                        device= self.device,
                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         self.low_ques_rnn = StackedLSTM(input_size=question_input_size,
                                         hidden_size=opt['hidden_size'],
-                                        num_layers=1,
+                                        num_layers=opt['num_layers'],
                                         dropout=opt['dropout'],
                                         device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']])
@@ -113,14 +113,14 @@ class ReaderNet(nn.Module):
 
         self.high_doc_rnn = StackedLSTM(input_size=high_doc_hidden_size,
                                         hidden_size=opt['hidden_size'],
-                                        num_layers=1,
+                                        num_layers=opt['num_layers'],
                                         dropout=opt['dropout'],
                                         device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']])
 
         self.high_ques_rnn = StackedLSTM(input_size=high_ques_hidden_size,
                                          hidden_size=opt['hidden_size'],
-                                         num_layers=1,
+                                         num_layers=opt['num_layers'],
                                          dropout=opt['dropout'],
                                          device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']])
@@ -129,7 +129,7 @@ class ReaderNet(nn.Module):
 
         self.und_ques_rnn = StackedLSTM(input_size=und_q_word_size,
                                         hidden_size=opt['hidden_size'],
-                                        num_layers=1,
+                                        num_layers=opt['num_layers'],
                                         dropout=opt['dropout'],
                                         device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']])
@@ -159,7 +159,7 @@ class ReaderNet(nn.Module):
 
         self.fuse_rnn = StackedLSTM(input_size = fuse_inp_size,
                                     hidden_size = opt['hidden_size'],
-                                    num_layers = 1,
+                                    num_layers = opt['num_layers'],
                                     dropout = opt['dropout'],
                                     device=self.device,
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']])
@@ -178,7 +178,7 @@ class ReaderNet(nn.Module):
 
         self.self_rnn = StackedLSTM(input_size = 2 * (2 * opt['hidden_size']),
                                     hidden_size = opt['hidden_size'],
-                                    num_layers = 1,
+                                    num_layers = opt['num_layers'],
                                     dropout = opt['dropout'],
                                     device=self.device,
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']])

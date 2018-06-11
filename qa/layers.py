@@ -32,7 +32,7 @@ class StackedLSTM(nn.Module) :
         for layer in range(num_layers) :
             self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
                                      hidden_size = hidden_size,
-                                     num_layers = 1,
+                                     num_layers = num_layers,
                                      dropout = 0,
                                      batch_first=True,
                                      bidirectional=True))

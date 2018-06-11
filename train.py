@@ -55,6 +55,7 @@ def setup():
     parser.add_argument('--fix_embeddings', action='store_true',
                         help='if true, `tune_partial` will be ignored.')
     # model
+    parser.add_argument('--num_layers', type=int, default=1)
     parser.add_argument('--rnn_type', type=str, default='lstm')
     parser.add_argument('--use_char', action='store_true')
     parser.add_argument('--use_cove', action='store_true')
@@ -77,7 +78,7 @@ def setup():
     os.makedirs(model_dir, exist_ok=True)
     args.model_dir = os.path.abspath(model_dir)
 
-    if args.resume == 'fusion_char_elmo.pt' and not os.path.exists(os.path.join(args.model_dir, args.resume)):
+    if args.resume == 'best_model.pt' and not os.path.exists(os.path.join(args.model_dir, args.resume)):
         # means we're starting fresh
         args.resume = ''
 
