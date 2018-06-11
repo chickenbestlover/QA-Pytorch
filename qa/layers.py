@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import cuda_functional as custom_nn
 
 class SRU(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers,dropout,bidirectional=True,batch_first=True):
+    def __init__(self, input_size, hidden_size, num_layers=1,dropout=0,bidirectional=True,batch_first=True):
         super(SRU, self).__init__()
         self.sru = custom_nn.SRU(input_size= input_size,
                                  hidden_size=hidden_size,
@@ -16,7 +16,7 @@ class SRU(nn.Module):
                                  bidirectional=bidirectional)
     def forward(self, x):
         return self.sru.forward(x.transpose(0,1)).transpose(0,1)
-        
+
 class StackedLSTM(nn.Module) :
 
     def __init__(self, input_size, hidden_size, num_layers, dropout, concat = True, device = 'cuda', rnn_type=nn.LSTM) :
@@ -28,16 +28,16 @@ class StackedLSTM(nn.Module) :
         self.rnns = nn.ModuleList()
 
         for layer in range(num_layers) :
-            self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
-                                     hidden_size = hidden_size,
-                                     num_layers = 1,
-                                     dropout = 0,
-                                     batch_first=True,
+            # self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
+            #                          hidden_size = hidden_size,
+            #                          num_layers = 1,
+            #                          dropout = 0,
+            #                          batch_first=True,
+            #                          bidirectional=True))
+            self.rnns.append(SRU(input_size= input_size if layer == 0 else 2 * hidden_size,
+                                     hidden_size=hidden_size,
+                                     dropout=0,
                                      bidirectional=True))
-            #self.rnns.append(SRUCell(input_size= input_size if layer == 0 else 2 * hidden_size,
-            #                         hidden_size=hidden_size,
-            #                         dropout=0,
-            #                         bidirectional=True))
     def forward(self, x) :
 
         outputs = [x]
