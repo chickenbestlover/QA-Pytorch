@@ -17,9 +17,9 @@ class SRU(nn.Module):
     def forward(self, x):
         print(len(x))
         print(x[0].size(),x[1].size())
-        x = (d.transpose(0,1) for d in x)
-        out = self.sru.forward(x)
-        out = (d.transpose(0,1) for d in out)
+        #x = (d.transpose(0,1) for d in x)
+        out = self.sru.forward(x.transpose(0,1)).transpose(0,1)
+        #ut = (d.transpose(0,1) for d in out)
         return out
 
 class StackedLSTM(nn.Module) :
