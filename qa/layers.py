@@ -7,11 +7,11 @@ import cuda_functional as custom_nn
 class SRU(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers=1,dropout=0,bidirectional=True,batch_first=True):
         super(SRU, self).__init__()
-        self.sru = custom_nn.SRU(input_size= input_size,
-                                 hidden_size=hidden_size,
-                                 num_layers=num_layers,
+        self.sru = custom_nn.SRUCell(n_in= input_size,
+                                 n_out=hidden_size,
                                  dropout=dropout,
                                  rnn_dropout=0,
+                                 use_tanh=0,
                                  use_selu=1,
                                  bidirectional=bidirectional,
                                  layer_norm=True,
