@@ -353,7 +353,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
 
     # save
     model_file = os.path.join(args.model_dir,
-                              'checkpoint_'+
+                              'checkpoint'+
                               '_char'+str(opt['use_char'])+
                               '_cove'+str(opt['use_cove'])+
                               '_elmo'+str(opt['use_elmo'])+
@@ -366,7 +366,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
         copyfile(
             model_file,
             os.path.join(args.model_dir,
-                         '_char'+str(opt['use_char'])+
+                         'char'+str(opt['use_char'])+
                          '_cove'+str(opt['use_cove'])+
                          '_elmo'+str(opt['use_elmo'])+
                          '_hidden' + str(opt['hidden_size']) +

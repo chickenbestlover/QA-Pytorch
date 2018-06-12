@@ -309,7 +309,7 @@ while True:
 
     try:
         try:
-            evidence = input(colored('Evidence: ','blue'))
+            evidence = input(colored('Evidence: ','yellow'))
             if evidence.strip(): pass
         except UnicodeDecodeError as e:
             print(e)
@@ -320,7 +320,7 @@ while True:
         except:
             pass
         try:
-            question = input(colored('Question: ','blue'))
+            question = input(colored('Question: ','yellow'))
             if question.strip(): pass
 
         except UnicodeDecodeError as e:
