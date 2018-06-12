@@ -305,6 +305,8 @@ opt['vocab_size']=90968
 opt['embedding_dim']=300
 opt['cuda']=args.cuda
 opt['data_path']=args.data_path
+opt['num_layers']=1
+opt['dropout_rnn']=0
 opt['MTLSTM_path']='./qa/cove/MT-LSTM.pth'
 print(opt)
 print('[Data loaded.] \n')

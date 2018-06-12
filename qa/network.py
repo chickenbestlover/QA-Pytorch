@@ -21,6 +21,7 @@ class ReaderNet(nn.Module):
         super(ReaderNet, self).__init__()
         # Store config
         self.opt = opt
+
         self.device = 'cuda' if opt['cuda'] else 'cpu'
 
         # Word embeddings
