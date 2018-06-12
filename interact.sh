@@ -1,4 +1,4 @@
 
 source ~/.bashrc
 source ~/.profile
-python /opt/pytorch/QA-Pytorch/interact_langs_ELMo.py
+python /opt/pytorch/QA-Pytorch/interact.py
