@@ -19,7 +19,11 @@ class MTLSTM(nn.Module):
         else:
             self.embedding = nn.Embedding(opt['vocab_size'], opt['embedding_dim'], padding_idx=padding_idx)
 
-        state_dict = torch.load(opt['MTLSTM_path'])
+        if opt['cuda']:
+            state_dict = torch.load(opt['MTLSTM_path'])
+        else
+            state_dict = torch.load(opt['MTLSTM_path'],map_location = lambda storage, loc: storage)
+
         self.rnn1 = nn.LSTM(300, 300, num_layers=1, bidirectional=True)
         self.rnn2 = nn.LSTM(600, 300, num_layers=1, bidirectional=True)
 
@@ -61,7 +65,7 @@ class MTLSTM(nn.Module):
         """
         emb = self.embedding #if self.training else self.eval_embed
         x_hiddens = emb(x_idx)
-        if x_hiddens.size(0)>1:
+        if x_hiddens.size(0)>1: # Pack the sequence when batch_size >1
             lengths = x_mask.data.eq(0).long().sum(1).squeeze()
             lens, indices = torch.sort(lengths, 0, True)
             output1, _ = self.rnn1(pack(x_hiddens[indices], lens.tolist(), batch_first=True))
@@ -74,7 +78,7 @@ class MTLSTM(nn.Module):
             output1 = output1[_indices]
             output2 = output2[_indices]
             return output1, output2
-        else:
+        else: # Do not pack the sequence when batch_size=1
             output1, _ = self.rnn1(x_hiddens.transpose(0,1))
             output2, _ = self.rnn2(output1)
 
