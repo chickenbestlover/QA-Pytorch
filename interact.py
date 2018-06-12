@@ -234,12 +234,13 @@ class Inference(object):
 def translate(text,target='en',verbose=True):
     client_ids = ["oEooJH6eT7xUFD5CT95j","ox4piK3YeFv28nLO89dN"]
     client_secrets = ["KPrgMruWXq","LOUsauFrbP"]
+    idx=random.randrange(len(client_ids))
     text_enc = urllib.parse.quote(text)
     data = "query=" + text_enc
     url = "https://openapi.naver.com/v1/papago/detectLangs"
     request = urllib.request.Request(url)
-    request.add_header("X-Naver-Client-Id", client_ids[random.randrange(len(client_ids))])
-    request.add_header("X-Naver-Client-Secret", client_secrets[random.randrange(len(client_ids))])
+    request.add_header("X-Naver-Client-Id", client_ids[idx])
+    request.add_header("X-Naver-Client-Secret", client_secrets[idx])
     response = urllib.request.urlopen(request, data=data.encode('utf-8'))
     rescode = response.getcode()
     lang = 'unk'
@@ -251,8 +252,8 @@ def translate(text,target='en',verbose=True):
             data = "source="+lang+"&target="+target+"&text=" + text_enc
             url = "https://openapi.naver.com/v1/papago/n2mt"
             request = urllib.request.Request(url)
-            request.add_header("X-Naver-Client-Id", client_ids[random.randrange(len(client_ids))])
-            request.add_header("X-Naver-Client-Secret", client_secrets[random.randrange(len(client_ids))])
+            request.add_header("X-Naver-Client-Id", client_ids[idx])
+            request.add_header("X-Naver-Client-Secret", client_secrets[idx])
             response = urllib.request.urlopen(request, data=data.encode('utf-8'))
             rescode = response.getcode()
             if (rescode == 200):
