@@ -21,7 +21,7 @@ class MTLSTM(nn.Module):
 
         if opt['cuda']:
             state_dict = torch.load(opt['MTLSTM_path'])
-        else
+        else:
             state_dict = torch.load(opt['MTLSTM_path'],map_location = lambda storage, loc: storage)
 
         self.rnn1 = nn.LSTM(300, 300, num_layers=1, bidirectional=True)
