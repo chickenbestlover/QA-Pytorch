@@ -29,12 +29,6 @@ class Inference(object):
         self.char2idx_dict = self.get_data(args.data_path + 'char2id.json')
         self.pos2idx_dict = self.get_data(args.data_path + 'pos2id.json')
         self.ner2idx_dict = self.get_data(args.data_path + 'ner2id.json')
-        options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/" \
-                       "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json"
-        weight_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/" \
-                      "2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5"
-        self.elmo = Elmo(options_file, weight_file, 2, dropout=0).to(self.device)
-
         self.model = QAModel(opt, embedding=None, state_dict=state_dict)
 
     def get_data(self,filename):
@@ -218,8 +212,6 @@ class Inference(object):
 
         p_mask = self.compute_mask(passage_ids)
         q_mask = self.compute_mask(ques_ids)
-        passage_elmo = self.elmo(passage_elmo_ids)['elmo_representations'][0]
-        question_elmo = self.elmo(question_elmo_ids)['elmo_representations'][0]
 
         return (passage_ids,
                passage_char_ids,
@@ -235,8 +227,8 @@ class Inference(object):
                ques_pos_ids,
                ques_ner_ids,
                q_mask,
-               passage_elmo,
-               question_elmo), spans
+               passage_elmo_ids,
+               question_elmo_ids), spans
 
 
 def translate(text,target='en',verbose=True):
@@ -284,7 +276,7 @@ def translate(text,target='en',verbose=True):
 
 
 parser = argparse.ArgumentParser(
-    description='inferene model.'
+    description='Inference model.'
 )
 parser.add_argument('--data_path', default='./SQuAD/')
 parser.add_argument('--model_file', default='models/best_model.pt',
@@ -355,7 +347,8 @@ while True:
     try:
         prediction=infer.response(evidence,question)
         rescode_p, prediction, _ = translate(prediction,lang_q,verbose=False)
-    except:
+    except Exception as e:
+        print(e)
         print(colored('Error  : ', 'red'), 'Please try again with another natural language input. \n')
         continue
     end_time = time.time()

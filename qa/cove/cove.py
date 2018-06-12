@@ -61,17 +61,21 @@ class MTLSTM(nn.Module):
         """
         emb = self.embedding #if self.training else self.eval_embed
         x_hiddens = emb(x_idx)
+        if x_hiddens.size(0)>1:
+            lengths = x_mask.data.eq(0).long().sum(1).squeeze()
+            lens, indices = torch.sort(lengths, 0, True)
+            output1, _ = self.rnn1(pack(x_hiddens[indices], lens.tolist(), batch_first=True))
+            output2, _ = self.rnn2(output1)
 
-        lengths = x_mask.data.eq(0).long().sum(1).squeeze()
-        lens, indices = torch.sort(lengths, 0, True)
-        output1, _ = self.rnn1(pack(x_hiddens[indices], lens.tolist(), batch_first=True))
-        output2, _ = self.rnn2(output1)
+            output1 = unpack(output1, batch_first=True)[0]
+            output2 = unpack(output2, batch_first=True)[0]
 
-        output1 = unpack(output1, batch_first=True)[0]
-        output2 = unpack(output2, batch_first=True)[0]
+            _, _indices = torch.sort(indices, 0)
+            output1 = output1[_indices]
+            output2 = output2[_indices]
+            return output1, output2
+        else:
+            output1, _ = self.rnn1(x_hiddens.transpose(0,1))
+            output2, _ = self.rnn2(output1)
 
-        _, _indices = torch.sort(indices, 0)
-        output1 = output1[_indices]
-        output2 = output2[_indices]
-
-        return output1, output2
+            return output1.transpose(0,1), output2.transpose(0,1)
