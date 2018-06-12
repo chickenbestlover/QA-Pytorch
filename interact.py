@@ -302,6 +302,7 @@ else:
 state_dict = checkpoint['state_dict']
 opt = checkpoint['config']
 opt['vocab_size']=90968
+opt['rnn_type']='lstm'
 opt['embedding_dim']=300
 opt['cuda']=args.cuda
 opt['data_path']=args.data_path
