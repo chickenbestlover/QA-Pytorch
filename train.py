@@ -39,7 +39,7 @@ def setup():
                              'e.g. "checkpoint_epoch_11.pt"')
     parser.add_argument('-ro', '--resume_options', action='store_true',
                         help='use previous model options, ignore the cli and defaults.')
-    parser.add_argument('--decay_period', type=int, default=15)
+    parser.add_argument('--decay_period', type=int, default=20)
     parser.add_argument('-rlr', '--reduce_lr', type=float, default=0.5,
                         help='reduce initial (resumed) learning rate by this factor.')
     parser.add_argument('-op', '--optimizer', default='adamax',
@@ -60,6 +60,7 @@ def setup():
     parser.add_argument('--use_char', action='store_true')
     parser.add_argument('--use_cove', action='store_true')
     parser.add_argument('--use_elmo', action='store_true')
+    parser.add_argument('--use_res', action='store_true')
     parser.add_argument('--MTLSTM_path', type=str, default='./qa/cove/MT-LSTM.pth')
     parser.add_argument('--char_hidden_size', type=int, default=100)
     parser.add_argument('--hidden_size', type=int, default=100)
@@ -359,6 +360,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                               '_elmo'+str(opt['use_elmo'])+
                               '_hidden'+str(opt['hidden_size'])+
                               '_' + str(opt['rnn_type']) + str(opt['num_layers'])+
+                              '_res' + str(opt['use_res']) +
                               '.pt')
     model.save(model_file, epoch, [em, f1, best_val_score])
     if f1 > best_val_score:
@@ -371,6 +373,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                          '_elmo'+str(opt['use_elmo'])+
                          '_hidden' + str(opt['hidden_size']) +
                          '_' + str(opt['rnn_type']) + str(opt['num_layers']) +
+                         '_res' + str(opt['use_res']) +
                          '.pt'))
 
         log.info('[new best model saved.] \n')
