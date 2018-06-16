@@ -243,7 +243,7 @@ class GroupNorm(nn.Module):
         if x.size(-1) == 1:
             return x
         N,seq_len,H = x.size()
-        x = x.view(N*seq_len,self.num_group,-1)
+        x = x.contiguous().view(N*seq_len,self.num_group,-1)
         mu = torch.mean(x, dim=-1)
         sigma = torch.std(x, dim=-1, unbiased=False)
         # HACK. PyTorch is changing behavior
