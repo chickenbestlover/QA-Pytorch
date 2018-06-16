@@ -22,7 +22,8 @@ class SRU(nn.Module):
 
 class StackedLSTM(nn.Module) :
 
-    def __init__(self, input_size, hidden_size, num_layers, dropout, dropout_rnn=0,concat = False, device = 'cuda', rnn_type=nn.LSTM, res=False) :
+    def __init__(self, input_size, hidden_size, num_layers, dropout,
+                 dropout_rnn=0,concat = False, device = 'cuda', rnn_type=nn.LSTM, res=False, norm=False) :
         super(StackedLSTM, self).__init__()
         self.device = device
         self.dropout = dropout
@@ -30,7 +31,10 @@ class StackedLSTM(nn.Module) :
         self.rnn_type =rnn_type
         self.num_layers = num_layers
         self.res =res
+        self.norm=norm
         self.rnns = nn.ModuleList()
+        if norm:
+            self.norm = GroupNorm(2*hidden_size,num_group=4)
 
         for layer in range(num_layers) :
             self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
@@ -39,6 +43,7 @@ class StackedLSTM(nn.Module) :
                                      dropout = dropout_rnn,
                                      batch_first=True,
                                      bidirectional=True))
+
 
     def forward(self, x) :
         x = Dropout(x, self.dropout, self.training, device=self.device)
@@ -54,6 +59,8 @@ class StackedLSTM(nn.Module) :
 
             if self.res and layer==self.num_layers-1:
                 out = out+inp_res
+            if self.norm and layer==self.num_layers-1:
+                out = self.norm(out)
             outputs.append(out)
 
         outputs = outputs[1:]
@@ -223,3 +230,28 @@ def Dropout(x, dropout, is_train, return_mask = False, var=True, device='cuda') 
 
 
     return x
+
+class GroupNorm(nn.Module):
+    def __init__(self, hidden_size, num_group=4,eps=1e-6):
+        super(GroupNorm, self).__init__()
+        self.eps = eps
+        self.num_group=num_group
+        self.a = nn.Parameter(torch.ones(hidden_size), requires_grad=True)
+        self.b = nn.Parameter(torch.zeros(hidden_size), requires_grad=True)
+
+    def forward(self, x):
+        if x.size(-1) == 1:
+            return x
+        N,seq_len,H = x.size()
+        x = x.view(N*seq_len,self.num_group,-1)
+        mu = torch.mean(x, dim=-1)
+        sigma = torch.std(x, dim=-1, unbiased=False)
+        # HACK. PyTorch is changing behavior
+        if mu.dim() == x.dim()-1:
+            mu = mu.unsqueeze(mu.dim())
+            sigma = sigma.unsqueeze(sigma.dim())
+        output = (x - mu.expand_as(x)) / (sigma.expand_as(x) + self.eps)
+        output =output.view(N,seq_len,H)
+        output = output.mul(self.a.expand_as(output)) \
+            + self.b.expand_as(output)
+        return output

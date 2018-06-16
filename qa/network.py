@@ -101,7 +101,8 @@ class ReaderNet(nn.Module):
                                        dropout_rnn=opt['dropout_rnn'],
                                        device= self.device,
                                        rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                       res=opt['use_res'])
+                                       res=opt['use_res'],
+                                       norm=opt['use_norm'])
 
         self.low_ques_rnn = StackedLSTM(input_size=question_input_size,
                                         hidden_size=opt['hidden_size'],
@@ -110,7 +111,8 @@ class ReaderNet(nn.Module):
                                         dropout_rnn=opt['dropout_rnn'],
                                         device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                        res=opt['use_res'])
+                                        res=opt['use_res'],
+                                        norm=opt['use_norm'])
 
         # Output sizes of low rnn encoders
         high_doc_hidden_size = 2 * opt['hidden_size']
@@ -123,7 +125,8 @@ class ReaderNet(nn.Module):
                                         dropout_rnn=opt['dropout_rnn'],
                                         device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                        res=opt['use_res'])
+                                        res=opt['use_res'],
+                                        norm=opt['use_norm'])
 
         self.high_ques_rnn = StackedLSTM(input_size=high_ques_hidden_size,
                                          hidden_size=opt['hidden_size'],
@@ -132,7 +135,8 @@ class ReaderNet(nn.Module):
                                          dropout_rnn=opt['dropout_rnn'],
                                          device= self.device,
                                          rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                         res=opt['use_res'])
+                                         res=opt['use_res'],
+                                         norm=opt['use_norm'])
 
         und_q_word_size = 2 * (2 * opt['hidden_size'])
 
@@ -143,7 +147,8 @@ class ReaderNet(nn.Module):
                                         dropout_rnn=opt['dropout_rnn'],
                                         device= self.device,
                                         rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                        res=opt['use_res'])
+                                        res=opt['use_res'],
+                                        norm=opt['use_norm'])
 
         attention_inp_size = opt['embedding_dim'] + 2 * (2 * opt['hidden_size'])
         if self.opt['use_cove']:
@@ -175,7 +180,8 @@ class ReaderNet(nn.Module):
                                     dropout_rnn=opt['dropout_rnn'],
                                     device=self.device,
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                    res=opt['use_res'])
+                                    res=opt['use_res'],
+                                    norm=opt['use_norm'])
 
         self_attention_inp_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']+ \
                                   6 * (2 * opt['hidden_size']) + 1
@@ -196,7 +202,8 @@ class ReaderNet(nn.Module):
                                     dropout = opt['dropout'],
                                     device=self.device,
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']],
-                                    res=opt['use_res'])
+                                    res=opt['use_res'],
+                                    norm=opt['use_norm'])
 
         self.summ_layer = Summ(input_size=2 * opt['hidden_size'],
                                dropout=opt['dropout'],
