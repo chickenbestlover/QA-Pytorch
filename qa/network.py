@@ -100,7 +100,8 @@ class ReaderNet(nn.Module):
                                        dropout=opt['dropout'],
                                        dropout_rnn=opt['dropout_rnn'],
                                        device= self.device,
-                                       rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                       rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                       res=opt['use_res'])
 
         self.low_ques_rnn = StackedLSTM(input_size=question_input_size,
                                         hidden_size=opt['hidden_size'],
@@ -108,7 +109,8 @@ class ReaderNet(nn.Module):
                                         dropout=opt['dropout'],
                                         dropout_rnn=opt['dropout_rnn'],
                                         device= self.device,
-                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                        res=opt['use_res'])
 
         # Output sizes of low rnn encoders
         high_doc_hidden_size = 2 * opt['hidden_size']
@@ -120,7 +122,8 @@ class ReaderNet(nn.Module):
                                         dropout=opt['dropout'],
                                         dropout_rnn=opt['dropout_rnn'],
                                         device= self.device,
-                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                        res=opt['use_res'])
 
         self.high_ques_rnn = StackedLSTM(input_size=high_ques_hidden_size,
                                          hidden_size=opt['hidden_size'],
@@ -128,7 +131,8 @@ class ReaderNet(nn.Module):
                                          dropout=opt['dropout'],
                                          dropout_rnn=opt['dropout_rnn'],
                                          device= self.device,
-                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                         rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                         res=opt['use_res'])
 
         und_q_word_size = 2 * (2 * opt['hidden_size'])
 
@@ -138,7 +142,8 @@ class ReaderNet(nn.Module):
                                         dropout=opt['dropout'],
                                         dropout_rnn=opt['dropout_rnn'],
                                         device= self.device,
-                                        rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                        rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                        res=opt['use_res'])
 
         attention_inp_size = opt['embedding_dim'] + 2 * (2 * opt['hidden_size'])
         if self.opt['use_cove']:
@@ -169,7 +174,8 @@ class ReaderNet(nn.Module):
                                     dropout = opt['dropout'],
                                     dropout_rnn=opt['dropout_rnn'],
                                     device=self.device,
-                                    rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                    rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                    res=opt['use_res'])
 
         self_attention_inp_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']+ \
                                   6 * (2 * opt['hidden_size']) + 1
@@ -189,7 +195,8 @@ class ReaderNet(nn.Module):
                                     dropout_rnn=opt['dropout_rnn'],
                                     dropout = opt['dropout'],
                                     device=self.device,
-                                    rnn_type=self.RNN_TYPES[opt['rnn_type']])
+                                    rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                    res=opt['use_res'])
 
         self.summ_layer = Summ(input_size=2 * opt['hidden_size'],
                                dropout=opt['dropout'],
