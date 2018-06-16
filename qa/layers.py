@@ -11,10 +11,10 @@ class SRU(nn.Module):
                                  n_out=hidden_size,
                                  dropout=dropout,
                                  rnn_dropout=0,
-                                 use_tanh=0,
-                                 use_selu=1,
+                                 use_tanh=1,
+                                 use_selu=0,
                                  bidirectional=bidirectional,
-                                 layer_norm=True,
+                                 layer_norm=False,
                                  rescale=False)
     def forward(self, x):
         out, c  = self.sru.forward(x.transpose(0,1))
