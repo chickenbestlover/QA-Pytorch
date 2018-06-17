@@ -38,11 +38,11 @@ class StackedLSTM(nn.Module) :
 
         for layer in range(num_layers) :
             self.rnns.append(rnn_type(input_size = input_size if layer == 0 else 2 * hidden_size,
-                                     hidden_size = hidden_size,
+                                     hidden_size = hidden_size if layer == 0 else 2* hidden_size,
                                      num_layers = 1,
                                      dropout = dropout_rnn,
                                      batch_first=True,
-                                     bidirectional=True))
+                                     bidirectional=True if layer == 0 else False))
 
 
     def forward(self, x) :
