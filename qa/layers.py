@@ -121,12 +121,15 @@ class FullAttention_multiHead(nn.Module) :
         self.hidden_size = hidden_size // n_head
         self.D = nn.Parameter(torch.ones(1, self.hidden_size), requires_grad=True)
         self.W = nn.Parameter(torch.randn(n_head, input_size, self.hidden_size,dtype=torch.float))
+        self.U = nn.Parameter(torch.randn(n_head,2 * hidden_size, self.hidden_size,dtype=torch.float))
         self.n_head = n_head
         self.V = nn.Linear(self.n_head*self.hidden_size, 2 * hidden_size)
         self.init_weights()
 
     def init_weights(self) :
         nn.init.xavier_uniform_(self.W.data)
+        nn.init.xavier_uniform_(self.U.data)
+        nn.init.xavier_uniform_(self.V.weight.data)
 
     def forward(self, passage, p_mask, question, q_mask, rep):
 
@@ -164,8 +167,8 @@ class FullAttention_multiHead(nn.Module) :
         alpha_flat = F.softmax(scores.view(-1, question.size(1)),dim=1)
         alpha = alpha_flat.view(-1, passage.size(1), question.size(1))
 
-        rep = rep.repeat(self.n_head,1,1).view(self.n_head,-1,rep.size(2))
-        rep = torch.bmm(rep,self.W)
+        rep = rep.repeat(self.n_head,1,1).view(self.n_head,-1,rep.size(2)) # n_head * (batch x len1) * input_size
+        rep = torch.bmm(rep,self.U)
         rep = rep.view(-1, rep.size(1),self.hidden_size) # (n_head x batch) * len1 * hidden_size
         rep = F.relu(rep)
 
