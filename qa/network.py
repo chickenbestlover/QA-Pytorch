@@ -186,11 +186,11 @@ class ReaderNet(nn.Module):
                                     res=opt['use_res'],
                                     norm=opt['use_norm'])
 
-        self.fuse_attn = FullAttention_multiHead(input_size=2*opt['hidden_size'],
-                                                 hidden_size=opt['attention_size'],
-                                                 dropout=opt['dropout'],
-                                                           n_head=5,
-                                                 device=self.device)
+        # self.fuse_attn = FullAttention_multiHead(input_size=2*opt['hidden_size'],
+        #                                          hidden_size=opt['attention_size'],
+        #                                          dropout=opt['dropout'],
+        #                                                    n_head=5,
+        #                                          device=self.device)
 
         self_attention_inp_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']+ \
                                   6 * (2 * opt['hidden_size']) + 1
@@ -323,7 +323,7 @@ class ReaderNet(nn.Module):
         fuse_inp = torch.cat([low_x1_states, high_x1_states, low_attention_outputs, high_attention_outputs, und_attention_outputs], dim = 2)
 
         fused_x1_states = self.fuse_rnn.forward(fuse_inp)
-        fused_x1_states = self.fuse_attn.forward(fused_x1_states,x1_mask,und_x2_states,x2_mask,fused_x1_states)
+        #fused_x1_states = self.fuse_attn.forward(fused_x1_states,x1_mask,und_x2_states,x2_mask,fused_x1_states)
 
         ### Self Full Attention ###
 
