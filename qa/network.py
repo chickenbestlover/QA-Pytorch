@@ -12,9 +12,9 @@ import torch
 import torch.nn as nn
 from qa.cove.cove import MTLSTM
 from qa.layers import StackedLSTM, Dropout, Summ, PointerNet, SRU
-#from qa.layers import FullAttention, WordAttention
+from qa.layers import FullAttention
 from qa.layers import WordAttention_multiHead as WordAttention
-from qa.layers import FullAttention_multiHead as FullAttention
+from qa.layers import FullAttention_multiHead
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
@@ -162,19 +162,16 @@ class ReaderNet(nn.Module):
         self.low_attention_layer = FullAttention(input_size = attention_inp_size,
                                                  hidden_size = opt['attention_size'],
                                                  dropout = opt['dropout'],
-                                                 n_head=2,
                                                  device= self.device)
 
         self.high_attention_layer = FullAttention(input_size=attention_inp_size,
                                                   hidden_size=opt['attention_size'],
                                                   dropout=opt['dropout'],
-                                                  n_head=2,
                                                   device=self.device)
 
         self.und_attention_layer = FullAttention(input_size=attention_inp_size,
                                                  hidden_size=opt['attention_size'],
                                                  dropout=opt['dropout'],
-                                                 n_head=2,
                                                  device=self.device)
 
         fuse_inp_size = 5 * (2 * opt['hidden_size'])
@@ -189,6 +186,12 @@ class ReaderNet(nn.Module):
                                     res=opt['use_res'],
                                     norm=opt['use_norm'])
 
+        self.fuse_attn = FullAttention_multiHead(input_size=2*opt['hidden_size'],
+                                                 hidden_size=opt['attention_size'],
+                                                 dropout=opt['dropout'],
+                                                           n_head=5,
+                                                 device=self.device)
+
         self_attention_inp_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']+ \
                                   6 * (2 * opt['hidden_size']) + 1
         if self.opt['use_cove']:
@@ -199,7 +202,6 @@ class ReaderNet(nn.Module):
         self.self_attention_layer = FullAttention(input_size=self_attention_inp_size,
                                                   hidden_size=opt['attention_size'],
                                                   dropout=opt['dropout'],
-                                                  n_head=2,
                                                   device=self.device)
 
         self.self_rnn = StackedLSTM(input_size = 2 * (2 * opt['hidden_size']),
@@ -211,7 +213,11 @@ class ReaderNet(nn.Module):
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']],
                                     res=opt['use_res'],
                                     norm=opt['use_norm'])
-
+        self.self_attn = FullAttention_multiHead(input_size=2*opt['hidden_size'],
+                                                 hidden_size=opt['attention_size'],
+                                                 dropout=opt['dropout'],
+                                                           n_head=5,
+                                                 device=self.device)
         self.summ_layer = Summ(input_size=2 * opt['hidden_size'],
                                dropout=opt['dropout'],
                                device=self.device)
@@ -317,6 +323,7 @@ class ReaderNet(nn.Module):
         fuse_inp = torch.cat([low_x1_states, high_x1_states, low_attention_outputs, high_attention_outputs, und_attention_outputs], dim = 2)
 
         fused_x1_states = self.fuse_rnn.forward(fuse_inp)
+        fused_x1_states = self.fuse_attn.forward(fused_x1_states,x1_mask,und_x2_states,x2_mask,fused_x1_states)
 
         ### Self Full Attention ###
 
@@ -333,12 +340,14 @@ class ReaderNet(nn.Module):
 
         self_inp = torch.cat([fused_x1_states, self_attention_outputs], dim=2)
 
-        und_doc_states = self.self_rnn.forward(self_inp)
+        und_x1_states = self.self_rnn.forward(self_inp)
+        und_x1_states = self.self_attn.forward(und_x1_states,x1_mask,und_x2_states,x2_mask,und_x1_states)
+
         ### ques summ vector ###
         init_states = self.summ_layer.forward(und_x2_states, x2_mask)
 
         ### Pointer Network ###
-        logits1, logits2 = self.pointer_layer.forward(und_doc_states, x1_mask, init_states)
+        logits1, logits2 = self.pointer_layer.forward(und_x1_states, x1_mask, init_states)
 
         return logits1, logits2
 
