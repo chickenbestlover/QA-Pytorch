@@ -139,22 +139,9 @@ class FullAttention_multiHead(nn.Module) :
             d_passage = passage
             d_ques = question
 
-        Up = F.relu(self.U(d_passage))
-        Uq = F.relu(self.U(d_ques))
-        D = self.D.expand_as(Uq)
-
-        Uq = D * Uq
-
-        scores = Up.bmm(Uq.transpose(2, 1))
-
-        mask = q_mask.unsqueeze(1).repeat(1, passage.size(1), 1)
-        scores.data.masked_fill_(mask.data, -float('inf'))
-        alpha = F.softmax(scores, 2)
-        output = torch.bmm(alpha, rep)
-
         # Project vectors
-        x_s = passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch x len1) * input_size
-        y_s = question.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch x len2) * input_size
+        x_s = d_passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch x len1) * input_size
+        y_s = d_ques.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch x len2) * input_size
         x_s = torch.bmm(x_s,self.W) # n_head * (batch x len1) * hidden_size
         y_s = torch.bmm(y_s, self.W)  # n_head * (batch x len2) * hidden_size
         x_s = x_s.view(-1,passage.size(1),self.hidden_size) # (n_head x batch) * len1 * hidden_size
@@ -257,8 +244,8 @@ class WordAttention_multiHead(nn.Module) :
             d_ques = question
 
         # Project vectors
-        x_s = passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch x len1) * input_size
-        y_s = question.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch x len2) * input_size
+        x_s = d_passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch x len1) * input_size
+        y_s = d_ques.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch x len2) * input_size
         x_s = torch.bmm(x_s,self.W) # n_head * (batch x len1) * hidden_size
         y_s = torch.bmm(y_s, self.W)  # n_head * (batch x len2) * hidden_size
         x_s = x_s.view(-1,passage.size(1),self.hidden_size) # (n_head x batch) * len1 * hhidden_size
