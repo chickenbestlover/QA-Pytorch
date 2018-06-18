@@ -149,6 +149,63 @@ class WordAttention(nn.Module) :
 
         return output
 
+class WordAttention_multiHead(nn.Module) :
+
+    def __init__(self, input_size, hidden_size, dropout, n_head=5,device = 'cuda') :
+        super(WordAttention_multiHead, self).__init__()
+        self.device = device
+        self.dropout = dropout
+        self.hidden_size = hidden_size // n_head
+        self.W = nn.Parameter(torch.FloatTensor(n_head, input_size, self.hidden_size))
+        self.n_head = n_head
+        self.init_weights()
+
+    def init_weights(self) :
+        nn.init.xavier_uniform_(self.W.weight.data)
+        self.W.bias.data.fill_(0.1)
+
+    def forward(self, passage, p_mask, question, q_mask):
+
+        if self.training:
+            keep_prob = 1.0 - self.dropout
+            drop_mask = Dropout(passage, self.dropout, self.training, return_mask = True, device = self.device)
+            d_passage = torch.div(passage, keep_prob) * drop_mask
+            d_ques = torch.div(question, keep_prob) * drop_mask
+        else :
+            d_passage = passage
+            d_ques = question
+
+        # Project vectors
+        x_s = passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch passage len1) * input_size
+        y_s = question.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch passage len2) * input_size
+        x_s = torch.bmm(x_s,self.w) # n_head * (batch passage len1) * hidden_size
+        y_s = torch.bmm(y_s, self.w)  # n_head * (batch passage len2) * hidden_size
+        x_s = x_s.view(-1,passage.size(1),self.hidden_size) # (n_head passage batch) * len1 * hhidden_size
+        y_s = y_s.view(-1, question.size(1), self.hidden_size) # (n_head passage batch) * len2 * hidden_size
+        x_s_proj = F.relu(x_s)
+        y_s_proj = F.relu(y_s)
+
+        # Compute scores
+        scores = x_s_proj.bmm(y_s_proj.transpose(2, 1)) # (n_head passage batch) * len1 * len2
+
+        # Mask padding
+        mask = q_mask.unsqueeze(1).repeat(self.n_head,passage.size(1),1)
+        #print('y_mask:',y_mask.size())
+        #print('scores:', scores.size())
+
+        scores.data.masked_fill_(mask.data, -float('inf'))
+
+        # Normalize with softmax
+        alpha_flat = F.softmax(scores.view(-1, question.size(1)),dim=1)
+        alpha = alpha_flat.view(-1, passage.size(1), question.size(1))
+
+        # Take weighted average
+        matched_seq = alpha.bmm(y_s) # (n_head passage batch) * len1 * hidden_size
+        matched_seq = torch.cat(torch.split(matched_seq,passage.size(0),dim=0),dim=-1) # batch passage len1 passage (n_head * hidden_size)
+
+        return matched_seq
+
+
 class Summ(nn.Module) :
 
     def __init__(self, input_size, dropout, device = 'cuda') :
