@@ -11,7 +11,9 @@
 import torch
 import torch.nn as nn
 from qa.cove.cove import MTLSTM
-from qa.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet, SRU, WordAttention_multiHead
+from qa.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet, SRU
+from qa.layers import WordAttention_multiHead as WordAttention
+from qa.layers import FullAttention_multiHead as FullAttention
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
@@ -89,7 +91,7 @@ class ReaderNet(nn.Module):
             doc_input_size += opt['elmo_dim']
             question_input_size += opt['elmo_dim']
 
-        self.word_attention_layer = WordAttention_multiHead(input_size = opt['embedding_dim'],
+        self.word_attention_layer = WordAttention(input_size = opt['embedding_dim'],
                                                   hidden_size = opt['attention_size'],
                                                   dropout = opt['dropout_emb'],
                                                   device= self.device)
