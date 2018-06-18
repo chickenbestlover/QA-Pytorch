@@ -162,16 +162,19 @@ class ReaderNet(nn.Module):
         self.low_attention_layer = FullAttention(input_size = attention_inp_size,
                                                  hidden_size = opt['attention_size'],
                                                  dropout = opt['dropout'],
+                                                 n_head=2,
                                                  device= self.device)
 
         self.high_attention_layer = FullAttention(input_size=attention_inp_size,
                                                   hidden_size=opt['attention_size'],
                                                   dropout=opt['dropout'],
+                                                  n_head=2,
                                                   device=self.device)
 
         self.und_attention_layer = FullAttention(input_size=attention_inp_size,
                                                  hidden_size=opt['attention_size'],
                                                  dropout=opt['dropout'],
+                                                 n_head=2,
                                                  device=self.device)
 
         fuse_inp_size = 5 * (2 * opt['hidden_size'])
@@ -196,6 +199,7 @@ class ReaderNet(nn.Module):
         self.self_attention_layer = FullAttention(input_size=self_attention_inp_size,
                                                   hidden_size=opt['attention_size'],
                                                   dropout=opt['dropout'],
+                                                  n_head=2,
                                                   device=self.device)
 
         self.self_rnn = StackedLSTM(input_size = 2 * (2 * opt['hidden_size']),
