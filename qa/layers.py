@@ -156,12 +156,12 @@ class WordAttention_multiHead(nn.Module) :
         self.device = device
         self.dropout = dropout
         self.hidden_size = hidden_size // n_head
-        self.W = nn.Parameter(torch.FloatTensor(n_head, input_size, self.hidden_size))
+        self.W = nn.Parameter(torch.randn(n_head, input_size, self.hidden_size,dtype=torch.float))
         self.n_head = n_head
         self.init_weights()
 
     def init_weights(self) :
-        nn.init.xavier_uniform_(self.W.weight.data)
+        nn.init.xavier_uniform_(self.W.data)
         self.W.bias.data.fill_(0.1)
 
     def forward(self, passage, p_mask, question, q_mask):
