@@ -122,7 +122,7 @@ class FullAttention_multiHead(nn.Module) :
         self.D = nn.Parameter(torch.ones(1, self.hidden_size), requires_grad=True)
         self.W = nn.Parameter(torch.randn(n_head, input_size, self.hidden_size,dtype=torch.float))
         self.n_head = n_head
-        self.V = nn.Linear(self.n_head*self.hidden_Size, 2 * hidden_size)
+        self.V = nn.Linear(self.n_head*self.hidden_size, 2 * hidden_size)
         self.init_weights()
 
     def init_weights(self) :
