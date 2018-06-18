@@ -11,9 +11,10 @@
 import torch
 import torch.nn as nn
 from qa.cove.cove import MTLSTM
-from qa.layers import StackedLSTM, Dropout, FullAttention, WordAttention, Summ, PointerNet, SRU
+from qa.layers import StackedLSTM, Dropout, Summ, PointerNet, SRU
+#from qa.layers import FullAttention, WordAttention
 from qa.layers import WordAttention_multiHead as WordAttention
-#from qa.layers import FullAttention_multiHead as FullAttention
+from qa.layers import FullAttention_multiHead as FullAttention
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 

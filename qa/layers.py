@@ -164,7 +164,7 @@ class FullAttention_multiHead(nn.Module) :
         alpha_flat = F.softmax(scores.view(-1, question.size(1)),dim=1)
         alpha = alpha_flat.view(-1, passage.size(1), question.size(1))
 
-        rep = rep.repeat(self.n_head,1,1).view(self.h_head,-1,rep.size(2))
+        rep = rep.repeat(self.n_head,1,1).view(self.n_head,-1,rep.size(2))
         rep = torch.bmm(rep,self.W)
         rep = rep.view(-1, rep.size(1),self.hidden_size) # (n_head x batch) * len1 * hidden_size
         rep = F.relu(rep)
