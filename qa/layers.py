@@ -162,7 +162,6 @@ class WordAttention_multiHead(nn.Module) :
 
     def init_weights(self) :
         nn.init.xavier_uniform_(self.W.data)
-        self.W.bias.data.fill_(0.1)
 
     def forward(self, passage, p_mask, question, q_mask):
 
