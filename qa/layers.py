@@ -141,7 +141,6 @@ class FullAttention_multiHead(nn.Module) :
         else :
             d_passage = passage
             d_ques = question
-
         # Project vectors
         x_s = d_passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch x len1) * input_size
         y_s = d_ques.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch x len2) * input_size
@@ -168,6 +167,7 @@ class FullAttention_multiHead(nn.Module) :
         alpha = alpha_flat.view(-1, passage.size(1), question.size(1))
 
         rep = rep.repeat(self.n_head,1,1).view(self.n_head,-1,rep.size(2)) # n_head * (batch x len1) * input_size
+        print(rep.size())
         rep = torch.bmm(rep,self.U)
         rep = rep.view(-1, rep.size(1),self.hidden_size) # (n_head x batch) * len1 * hidden_size
         rep = F.relu(rep)
