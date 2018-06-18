@@ -121,15 +121,15 @@ class FullAttention_multiHead(nn.Module) :
         self.hidden_size = hidden_size // n_head
         self.D = nn.Parameter(torch.ones(1, self.hidden_size), requires_grad=True)
         self.W = nn.Parameter(torch.randn(n_head, input_size, self.hidden_size,dtype=torch.float))
-        self.U = nn.Parameter(torch.randn(n_head, hidden_size, self.hidden_size,dtype=torch.float))
+        #self.U = nn.Parameter(torch.randn(n_head, hidden_size, self.hidden_size,dtype=torch.float))
         self.n_head = n_head
-        self.V = nn.Linear(self.n_head*self.hidden_size, hidden_size)
+        #self.V = nn.Linear(self.n_head*self.hidden_size, hidden_size)
         self.init_weights()
 
     def init_weights(self) :
         nn.init.xavier_uniform_(self.W.data)
-        nn.init.xavier_uniform_(self.U.data)
-        nn.init.xavier_uniform_(self.V.weight.data)
+        #nn.init.xavier_uniform_(self.U.data)
+        #nn.init.xavier_uniform_(self.V.weight.data)
 
     def forward(self, passage, p_mask, question, q_mask, rep):
 
@@ -165,17 +165,18 @@ class FullAttention_multiHead(nn.Module) :
         # Normalize with softmax
         alpha_flat = F.softmax(scores.view(-1, question.size(1)),dim=1)
         alpha = alpha_flat.view(-1, passage.size(1), question.size(1))
-        N,rep_len,f_size = rep.size()
-        rep = rep.repeat(self.n_head,1,1).view(self.n_head,-1,f_size) # n_head * (batch x len1) * input_size
-        rep = torch.bmm(rep,self.U)
-        rep = rep.view(-1, rep_len,self.hidden_size) # (n_head x batch) * len1 * hidden_size
-        rep = F.relu(rep)
+
+       # N,rep_len,f_size = rep.size()
+        #rep = rep.repeat(self.n_head,1,1).view(self.n_head,-1,f_size) # n_head * (batch x len1) * input_size
+        #rep = torch.bmm(rep,self.U)
+        #rep = rep.view(-1, rep_len,self.hidden_size) # (n_head x batch) * len1 * hidden_size
+        #rep = F.relu(rep)
 
 
         # Take weighted average
-        matched_seq = alpha.bmm(rep) # (n_head x batch) * len1 * hidden_size
+        matched_seq = alpha.bmm(y_s) # (n_head x batch) * len1 * hidden_size
         matched_seq = torch.cat(torch.split(matched_seq,passage.size(0),dim=0),dim=-1) # batch x len1 x (n_head * hidden_size)
-        matched_seq = F.relu(self.V(matched_seq)) # batch x len1 x output_size
+        #matched_seq = F.relu(self.V(matched_seq)) # batch x len1 x output_size
 
         return matched_seq
 
