@@ -177,8 +177,8 @@ class WordAttention_multiHead(nn.Module) :
         # Project vectors
         x_s = passage.repeat(self.n_head,1,1).view(self.n_head,-1,passage.size(2)) # n_head * (batch passage len1) * input_size
         y_s = question.repeat(self.n_head, 1, 1).view(self.n_head, -1, question.size(2)) # n_head * (batch passage len2) * input_size
-        x_s = torch.bmm(x_s,self.w) # n_head * (batch passage len1) * hidden_size
-        y_s = torch.bmm(y_s, self.w)  # n_head * (batch passage len2) * hidden_size
+        x_s = torch.bmm(x_s,self.W) # n_head * (batch passage len1) * hidden_size
+        y_s = torch.bmm(y_s, self.W)  # n_head * (batch passage len2) * hidden_size
         x_s = x_s.view(-1,passage.size(1),self.hidden_size) # (n_head passage batch) * len1 * hhidden_size
         y_s = y_s.view(-1, question.size(1), self.hidden_size) # (n_head passage batch) * len2 * hidden_size
         x_s_proj = F.relu(x_s)
