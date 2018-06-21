@@ -12,9 +12,9 @@ import torch
 import torch.nn as nn
 from qa.cove.cove import MTLSTM
 from qa.layers import StackedLSTM, Dropout, Summ, PointerNet, SRU
-from qa.layers import FullAttention
-from qa.layers import WordAttention_multiHead as WordAttention
-from qa.layers import FullAttention_multiHead
+from qa.layers import FullAttention, WordAttention
+#from qa.layers import WordAttention_multiHead as WordAttention
+#from qa.layers import FullAttention_multiHead
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
@@ -215,11 +215,7 @@ class ReaderNet(nn.Module):
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']],
                                     res=opt['use_res'],
                                     norm=opt['use_norm'])
-        self.self_attn = FullAttention_multiHead(input_size=2*opt['hidden_size'],
-                                                 hidden_size=opt['attention_size'],
-                                                 dropout=opt['dropout'],
-                                                           n_head=5,
-                                                 device=self.device)
+
         self.summ_layer = Summ(input_size=2 * opt['hidden_size'],
                                dropout=opt['dropout'],
                                device=self.device)
@@ -346,7 +342,7 @@ class ReaderNet(nn.Module):
         self_inp = torch.cat([fused_x1_states, self_attention_outputs], dim=2)
 
         und_x1_states = self.self_rnn.forward(self_inp)
-        und_x1_states = self.self_attn.forward(und_x1_states,x1_mask,und_x2_states,x2_mask,und_x1_states)
+        #und_x1_states = self.self_attn.forward(und_x1_states,x1_mask,und_x2_states,x2_mask,und_x1_states)
 
         ### ques summ vector ###
         init_states = self.summ_layer.forward(und_x2_states, x2_mask)

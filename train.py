@@ -65,7 +65,7 @@ def setup():
     parser.add_argument('--use_norm', action='store_true')
     parser.add_argument('--MTLSTM_path', type=str, default='./qa/cove/MT-LSTM.pth')
     parser.add_argument('--char_hidden_size', type=int, default=100)
-    parser.add_argument('--hidden_size', type=int, default=100)
+    parser.add_argument('--hidden_size', type=int, default=125)
     parser.add_argument('--attention_size', type=int, default=250)
     parser.add_argument('--num_features', type=int, default=4)
     parser.add_argument('--char_dim', type=int, default=50)
@@ -360,6 +360,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                               '_char'+str(opt['use_char'])+
                               '_cove'+str(opt['use_cove'])+
                               '_elmo'+str(opt['use_elmo'])+
+                              '_aligned' + str(opt['use_aligned']) +
                               '_hidden'+str(opt['hidden_size'])+
                               '_' + str(opt['rnn_type']) + str(opt['num_layers'])+
                               '_res' + str(opt['use_res']) +
@@ -373,6 +374,7 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
                          'char'+str(opt['use_char'])+
                          '_cove'+str(opt['use_cove'])+
                          '_elmo'+str(opt['use_elmo'])+
+                         '_aligned' + str(opt['use_aligned']) +
                          '_hidden' + str(opt['hidden_size']) +
                          '_' + str(opt['rnn_type']) + str(opt['num_layers']) +
                          '_res' + str(opt['use_res']) +
