@@ -70,7 +70,7 @@ class ReaderNet(nn.Module):
         opt['cove_dim']=600
         opt['elmo_dim']=1024
         opt['embedding_dim']=self.embedding.weight.shape[1] # 300
-        doc_input_size = 2 * opt['embedding_dim'] + opt['num_features'] + opt['pos_dim'] + opt['ner_dim']
+        doc_input_size = opt['embedding_dim'] + opt['num_features'] + opt['pos_dim'] + opt['ner_dim']
         question_input_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']
 
 
@@ -92,10 +92,12 @@ class ReaderNet(nn.Module):
             doc_input_size += opt['elmo_dim']
             question_input_size += opt['elmo_dim']
 
-        self.word_attention_layer = WordAttention(input_size = opt['embedding_dim'],
-                                                  hidden_size = opt['attention_size'],
-                                                  dropout = opt['dropout_emb'],
-                                                  device= self.device)
+        if self.opt['use_aligned']:
+            doc_input_size += opt['embedding_dim']
+            self.word_attention_layer = WordAttention(input_size = opt['embedding_dim'],
+                                                      hidden_size = opt['attention_size'],
+                                                      dropout = opt['dropout_emb'],
+                                                      device= self.device)
 
         self.low_doc_rnn = StackedLSTM(input_size=doc_input_size,
                                        hidden_size=opt['hidden_size'],
@@ -276,10 +278,11 @@ class ReaderNet(nn.Module):
             for i in range(len(x1_elmo_embs)):
                 x1_elmo_embs[i] = Dropout(x1_elmo_embs[i], self.opt['dropout_emb'], self.training, device = self.device)
                 x2_elmo_embs[i] = Dropout(x2_elmo_embs[i], self.opt['dropout_emb'], self.training, device = self.device)
-        word_attention_outputs = self.word_attention_layer.forward(x1_glove_emb, x1_mask, x2_glove_emb, x2_mask)
+        if self.opt['use_aligned']:
+            word_attention_outputs = self.word_attention_layer.forward(x1_glove_emb, x1_mask, x2_glove_emb, x2_mask)
 
         x1_word_input = torch.cat(
-            [x1_glove_emb, x1_pos_emb, x1_ner_emb, x1_tf, word_attention_outputs, x1_origin, x1_lower, x1_lemma], dim=2)
+            [x1_glove_emb, x1_pos_emb, x1_ner_emb, x1_tf, x1_origin, x1_lower, x1_lemma], dim=2)
         x2_word_input = torch.cat([x2_glove_emb, x2_pos_emb, x2_ner_emb], dim=2)
 
         if self.opt['use_char'] :
@@ -291,6 +294,8 @@ class ReaderNet(nn.Module):
         if self.opt['use_elmo']:
             x1_word_input = torch.cat([x1_word_input, x1_elmo_embs[0]], dim=2)
             x2_word_input = torch.cat([x2_word_input, x2_elmo_embs[0]], dim=2)
+        if self.opt['use_aligned']:
+            x1_word_input = torch.cat([x1_word_input,word_attention_outputs], dim=2)
 
         ### low, high, understanding encoding ###
         low_x1_states = self.low_doc_rnn.forward(x1_word_input)

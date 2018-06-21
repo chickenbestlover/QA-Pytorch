@@ -60,6 +60,7 @@ def setup():
     parser.add_argument('--use_char', action='store_true')
     parser.add_argument('--use_cove', action='store_true')
     parser.add_argument('--use_elmo', action='store_true')
+    parser.add_argument('--use_aligned', action='store_true')
     parser.add_argument('--use_res', action='store_true')
     parser.add_argument('--use_norm', action='store_true')
     parser.add_argument('--MTLSTM_path', type=str, default='./qa/cove/MT-LSTM.pth')
