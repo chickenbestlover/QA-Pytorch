@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import random
 import cuda_functional as custom_nn
 
 class SRU(nn.Module):
@@ -383,3 +383,67 @@ class GroupNorm(nn.Module):
         output = output.mul(self.a.expand_as(output)) \
             + self.b.expand_as(output)
         return output
+
+class LSTMDecoder(nn.Module):
+    def __init__(self, input_size, hidden_size, embedding_size,embedding_dim, num_layers,embedding=None,
+                 padding_idx=0, dropout=0, teacher_forcing_ratio=0.5,device='cuda'):
+        super(LSTMDecoder, self).__init__()
+        self.dropout=dropout
+        self.teacher_forcing_ratio = teacher_forcing_ratio
+        self.device=device
+        self.rnn = torch.nn.LSTM(input_size=input_size,
+                                 hidden_size=hidden_size,
+                                 num_layers=num_layers,
+                                 dropout=0,
+                                 batch_first=True
+                                 )
+        # Word embeddings
+        if embedding is not None:
+            self.embedding = nn.Embedding.from_pretrained(embedding, freeze=False)
+        else:
+            self.embedding = nn.Embedding(num_embeddings=embedding_size,
+                                          embedding_dim=embedding_dim,
+                                          padding_idx=padding_idx)
+
+        self.linear = nn.Linear(in_features=hidden_size, out_features=embedding_size)
+
+    def forward(self, hidden, y_mask, y=None):
+
+        if self.training:
+            keep_prob = 1.0 - self.dropout
+            drop_mask = Dropout(hidden, self.dropout, self.training, return_mask = True, device = self.device)
+            hidden = torch.div(hidden, keep_prob) * drop_mask
+
+        outputs = []  # output vectors
+        outputs_indices = []  # output indices
+        max_length = y_mask.size(1)
+        USE_TEACHER_FORCING = random.random() < self.teacher_forcing_ratio
+        # USE_TEACHER_FORCING = True
+        x = torch.zeros(hidden.size(1),1).fill_(0).long().to(self.device)
+        lstm_hidden = (hidden,hidden)
+        for i in range(max_length):
+            x_emb = self.embedding(x) # batch x 1 x embedding_dim
+            #print('x_Emb:',x_emb.size())
+            #print('hidden:',hidden.size())
+            rnn_output, lstm_hidden = self.rnn.forward(input=x_emb, hx=lstm_hidden)
+            #print('rnn_output:', rnn_output.size())
+            output = self.linear.forward(rnn_output)
+            #print('output:', output.size())
+            outputs.append(output)
+            topValue, topIndex = output.data.topk(k=1, dim=2)
+            outputs_indices.append(topIndex.squeeze(1))
+            if self.training and USE_TEACHER_FORCING:
+                # Target becomes the next input
+                # print('target:',y[:,i].unsqueeze(1))
+                x = y[:, i].unsqueeze(1)  # Next target is next input
+            else:
+                # Network output becomes the next input
+                # print('topvalue:',topValue)
+                # print('topIndex:',topIndex)
+                x = topIndex.squeeze(1)  # [ batch x 1 ]
+
+        outputs = torch.cat(outputs, dim=1)  # [batch x seq_len x num_classes ]
+        outputs_indices = torch.cat(outputs_indices, dim=1)  # [ batch x seq_len ]
+        # print('outputs:', outputs.size())
+
+        return outputs, outputs_indices

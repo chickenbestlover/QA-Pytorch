@@ -15,6 +15,7 @@ from qa.layers import StackedLSTM, Dropout, Summ, PointerNet, SRU
 from qa.layers import FullAttention, WordAttention
 #from qa.layers import WordAttention_multiHead as WordAttention
 #from qa.layers import FullAttention_multiHead
+from qa.layers import LSTMDecoder
 import pickle as pkl
 from allennlp.modules.elmo import Elmo
 
@@ -155,6 +156,18 @@ class ReaderNet(nn.Module):
                                         res=opt['use_res'],
                                         norm=opt['use_norm'])
 
+        self.linear = nn.Linear(2*opt['hidden_size'],opt['embedding_dim'])
+        self.ques_decoder = LSTMDecoder(input_size = opt['embedding_dim'],
+                                        hidden_size= opt['embedding_dim'],
+                                        num_layers = opt['num_layers'],
+                                        dropout=opt['dropout'],
+                                        embedding_size=embedding.size(0),
+                                        embedding_dim=embedding.size(1),
+                                        embedding=self.embedding.weight,
+                                        device=self.device)
+        self.ques_decoder.embedding.weight = self.embedding.weight
+        self.ques_decoder.linear.weight = self.embedding.weight
+
         attention_inp_size = opt['embedding_dim'] + 2 * (2 * opt['hidden_size'])
         if self.opt['use_cove']:
             attention_inp_size += opt['cove_dim']
@@ -176,6 +189,16 @@ class ReaderNet(nn.Module):
                                                  dropout=opt['dropout'],
                                                  device=self.device)
 
+        self.low_ans_attn_layer = FullAttention(input_size = attention_inp_size,
+                                                 hidden_size = opt['attention_size'],
+                                                 dropout = opt['dropout'],
+                                                 device= self.device)
+
+        self.high_ans_attn_layer = FullAttention(input_size=attention_inp_size,
+                                                  hidden_size=opt['attention_size'],
+                                                  dropout=opt['dropout'],
+                                                  device=self.device)
+
         fuse_inp_size = 5 * (2 * opt['hidden_size'])
 
         self.fuse_rnn = StackedLSTM(input_size = fuse_inp_size,
@@ -187,6 +210,21 @@ class ReaderNet(nn.Module):
                                     rnn_type=self.RNN_TYPES[opt['rnn_type']],
                                     res=opt['use_res'],
                                     norm=opt['use_norm'])
+
+
+        fuse_ans_inp_size = 4 * (2 * opt['hidden_size'])
+
+        self.fuse_ans_rnn = StackedLSTM(input_size = fuse_ans_inp_size,
+                                    hidden_size = opt['hidden_size'],
+                                    num_layers = opt['num_layers'],
+                                    dropout = opt['dropout'],
+                                    dropout_rnn=opt['dropout_rnn'],
+                                    device=self.device,
+                                    rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                    res=opt['use_res'],
+                                    norm=opt['use_norm'])
+
+
 
         # self.fuse_attn = FullAttention_multiHead(input_size=2*opt['hidden_size'],
         #                                          hidden_size=opt['attention_size'],
@@ -205,6 +243,7 @@ class ReaderNet(nn.Module):
                                                   hidden_size=opt['attention_size'],
                                                   dropout=opt['dropout'],
                                                   device=self.device)
+
 
         self.self_rnn = StackedLSTM(input_size = 2 * (2 * opt['hidden_size']),
                                     hidden_size = opt['hidden_size'],
@@ -225,12 +264,39 @@ class ReaderNet(nn.Module):
                                         device=self.device)
 
 
+        self_attn_ans_inp_size = opt['embedding_dim'] + opt['pos_dim'] + opt['ner_dim']+ \
+                                  5 * (2 * opt['hidden_size']) + 1
+        if self.opt['use_cove']:
+            self_attn_ans_inp_size += opt['cove_dim']
+        if self.opt['use_elmo']:
+            self_attn_ans_inp_size += opt['elmo_dim']
+
+        self.self_attn_ans_layer = FullAttention(input_size=self_attn_ans_inp_size,
+                                                  hidden_size=opt['attention_size'],
+                                                  dropout=opt['dropout'],
+                                                  device=self.device)
+
+        self.self_ans_rnn = StackedLSTM(input_size = 2 * (2 * opt['hidden_size']),
+                                    hidden_size = opt['hidden_size'],
+                                    num_layers = opt['num_layers'],
+                                    dropout_rnn=opt['dropout_rnn'],
+                                    dropout = opt['dropout'],
+                                    device=self.device,
+                                    rnn_type=self.RNN_TYPES[opt['rnn_type']],
+                                    res=opt['use_res'],
+                                    norm=opt['use_norm'])
+
+        self.ans_summ_layer = Summ(input_size=2 * opt['hidden_size'],
+                               dropout=opt['dropout'],
+                               device=self.device)
+
+
     def reset_parameters(self) :
         if not self.opt['fix_embeddings'] :
             self.embedding.weight.data[self.fixed_idx] = self.fixed_embedding
 
     def forward(self, x1, x1_char, x1_pos, x1_ner, x1_origin, x1_lower, x1_lemma, x1_tf, x1_mask,
-                x2, x2_char, x2_pos, x2_ner, x2_mask, x1_elmo=None, x2_elmo=None):
+                x2, x2_char, x2_pos, x2_ner, x2_mask, x1_elmo=None, x2_elmo=None, start=None, end=None):
 
 
         ### GloVe ###
@@ -305,7 +371,6 @@ class ReaderNet(nn.Module):
 
         ########################################################################################
 
-
         ### Full Attention ###
 
         x1_How = torch.cat([x1_glove_emb, low_x1_states, high_x1_states], dim=2)
@@ -322,9 +387,17 @@ class ReaderNet(nn.Module):
         und_attention_outputs = self.und_attention_layer.forward(x1_How, x1_mask, x2_How, x2_mask, und_x2_states)
 
         fuse_inp = torch.cat([low_x1_states, high_x1_states, low_attention_outputs, high_attention_outputs, und_attention_outputs], dim = 2)
-
         fused_x1_states = self.fuse_rnn.forward(fuse_inp)
-        #fused_x1_states = self.fuse_attn.forward(fused_x1_states,x1_mask,und_x2_states,x2_mask,fused_x1_states)
+
+
+        if self.training:
+            ans_How,ans_mask = self.poolAnsState(x1_How,start,end)
+            low_ans_attn_outputs = self.low_ans_attn_layer.forward(ans_How, ans_mask, x1_How, x1_mask, low_x1_states)
+            high_ans_attn_outputs = self.high_ans_attn_layer.forward(ans_How, ans_mask, x1_How, x1_mask, high_x1_states)
+            #und_ans_attn_outputs = self.und_attention_layer.forward(ans_How, ans_mask, x1_How, x1_mask, und_x1_states)
+            fuse_ans_inp = torch.cat([ans_How[:,:,self.opt['embedding_dim']:self.opt['embedding_dim']+4*self.opt['hidden_size']],
+                                      low_ans_attn_outputs, high_ans_attn_outputs],dim=2)
+            fused_ans_states = self.fuse_ans_rnn.forward(fuse_ans_inp)
 
         ### Self Full Attention ###
 
@@ -346,10 +419,46 @@ class ReaderNet(nn.Module):
 
         ### ques summ vector ###
         init_states = self.summ_layer.forward(und_x2_states, x2_mask)
+        #print(init_states.size())
 
         ### Pointer Network ###
         logits1, logits2 = self.pointer_layer.forward(und_x1_states, x1_mask, init_states)
 
-        return logits1, logits2
+        if self.training:
+            x1_How = torch.cat([x1_glove_emb, x1_pos_emb, x1_ner_emb, x1_tf,
+                                low_x1_states, high_x1_states], dim=2)
+            if self.opt['use_cove']:
+                x1_How = torch.cat([x1_How, x1_cove_emb], dim=2)
+            if self.opt['use_elmo']:
+                x1_How = torch.cat([x1_How, x1_elmo_embs[2]], dim=2)
+            ans_How, ans_mask = self.poolAnsState(x1_How,start,end)
+            ans_How = torch.cat([ans_How,low_ans_attn_outputs, high_ans_attn_outputs, fused_ans_states],dim=2)
+            self_attn_ans_outputs = self.self_attn_ans_layer.forward(ans_How,ans_mask,ans_How,ans_mask,fused_ans_states)
+            self_ans_inp = torch.cat([fused_ans_states, self_attn_ans_outputs],dim=2)
+            und_ans_states = self.self_ans_rnn.forward(self_ans_inp)
+            ans_init_states = self.ans_summ_layer.forward(und_ans_states,ans_mask)
+            ans_init_states = self.linear(ans_init_states)
+            ques_decoded, _ = self.ques_decoder.forward(hidden=ans_init_states.unsqueeze(0),y_mask=x2_mask, y = x2)
 
+            init_states = self.linear(init_states)
+            ques_autodecoded, _ = self.ques_decoder.forward(hidden=init_states.unsqueeze(0),y_mask = x2_mask,y = x2)
+            return logits1, logits2, ques_autodecoded, ques_decoded
+        else:
+            return logits1, logits2
 
+    def poolAnsState(self,x1_states,start,end):
+        ans_How = []
+        ans_mask = []
+        lens = end - start + torch.ones(x1_states.size(0)).long().to(self.device)
+        max_len = torch.max(lens).item()
+        for seq, y1, y2 in zip(x1_states, start, end):
+            seq_len = y2.item() - y1.item() + 1
+            t = torch.zeros(max_len, x1_states.size(2)).to(self.device)
+            m = torch.ones(max_len).to(self.device)
+            t[:seq_len] = seq[y1.item():y2.item() + 1]
+            m[:seq_len].fill_(0)
+            ans_How.append(t)
+            ans_mask.append(m)
+        ans_How = torch.stack(ans_How, dim=0)
+        ans_mask = torch.stack(ans_mask, dim=0).byte()
+        return ans_How, ans_mask

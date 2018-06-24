@@ -24,6 +24,46 @@ from qa.evaluation import evaluate
 
 logger = logging.getLogger(__name__)
 
+def masked_cross_entropy(logits, target, target_mask):
+    """
+    Args:
+        logits: A Variable containing a FloatTensor of size
+            (batch, max_len, num_classes) which contains the
+            unnormalized probability for each class.
+        target: A Variable containing a LongTensor of size
+            (batch, max_len) which contains the index of the true
+            class for each corresponding step.
+        target_mask: A Variable containing a ByteTensor of size (batch, max_len)
+            which contains the mask of each data in a batch.
+    Returns:
+        loss: An average loss value masked by the length.
+    """
+    target_length = target.size(1)
+    # logits_flat: (batch * max_len, num_classes)
+    logits_flat = logits.view(-1, logits.size(-1))
+    #print('logits_flat_grad', logits_flat.requires_grad)
+
+    # log_probs_flat: (batch * max_len, num_classes)
+    log_probs_flat = F.log_softmax(logits_flat,dim=1)
+    #print('log_probs_grad', log_probs_flat.requires_grad)
+
+    # target_flat: (batch * max_len, 1)
+    target_flat = target.contiguous().view(-1, 1)
+    #print('target_flat_grad', target.requires_grad)
+    # losses_flat: (batch * max_len, 1)
+    losses_flat = -torch.gather(log_probs_flat, dim=1, index=target_flat)
+    #print('losses_flat_grad', losses_flat.requires_grad)
+
+    # losses: (batch, max_len)
+    losses = losses_flat.view(*target.size())
+    # mask: (batch, max_len)
+
+    losses.data.masked_fill_(target_mask.data.byte(),0)
+    #print('losses_grad', losses.requires_grad)
+    #print(target_mask)
+    loss = losses.sum() / torch.nonzero(losses.data).size(0)
+    #print('loss_grad',loss.requires_grad)
+    return loss
 
 class QAModel(object):
     """High level model that handles intializing the underlying network
@@ -36,9 +76,12 @@ class QAModel(object):
         self.device = torch.cuda.current_device() if opt['cuda'] else torch.device('cpu')
         self.updates = state_dict['updates'] if state_dict else 0
         self.train_loss = AverageMeter()
+        self.train_loss_q_autodecoded = AverageMeter()
+        self.train_loss_q_decoded = AverageMeter()
         if state_dict:
             self.train_loss.load(state_dict['loss'])
-
+            self.train_loss_q_autodecoded.load(state_dict['loss_q_auto'])
+            self.train_loss_q_decoded.load(state_dict['loss_q_decoded'])
         # Building network.
         self.network = ReaderNet(opt, embedding=embedding)
         if state_dict:
@@ -83,12 +126,17 @@ class QAModel(object):
             target_e = ex[-2].to(self.device)
 
             # Run forward
-            score_s, score_e = self.network(*ex[:-3])
+            score_s, score_e, ques_autodecoded, ques_decoded = self.network(*ex[:-1])
 
             # Compute loss and accuracies
-            loss = F.cross_entropy(score_s, target_s) + F.cross_entropy(score_e, target_e)
-            self.train_loss.update(loss.item())
+            loss1 = F.cross_entropy(score_s, target_s) + F.cross_entropy(score_e, target_e)
+            loss2 = masked_cross_entropy(ques_autodecoded,ex[9], ex[13])
+            loss3 = masked_cross_entropy(ques_decoded, ex[9], ex[13])
 
+            loss = loss1 + loss2 + loss3
+            self.train_loss.update(loss1.item())
+            self.train_loss_q_autodecoded.update(loss2.item())
+            self.train_loss_q_decoded.update(loss3.item())
             # Clear gradients and run backward
             self.optimizer.zero_grad()
             loss.backward()
@@ -169,7 +217,9 @@ class QAModel(object):
                 'network': self.network.state_dict(),
                 'optimizer': self.optimizer.state_dict(),
                 'updates': self.updates,
-                'loss': self.train_loss.state_dict()
+                'loss': self.train_loss.state_dict(),
+                'loss_q_auto': self.train_loss_q_autodecoded.state_dict(),
+                'loss_q_decoded': self.train_loss_q_decoded.state_dict(),
             },
             'config': self.opt,
             'epoch': epoch,

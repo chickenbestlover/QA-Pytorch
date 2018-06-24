@@ -340,8 +340,9 @@ for epoch in range(epoch_0, epoch_0 + args.epochs):
     for i, batch in enumerate(batches):
         model.update(batch)
         if i % args.log_per_updates == 0:
-            log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.5f}] remaining[{3}]'.format(
-                epoch, model.updates, model.train_loss.value,
+            log.info('> epoch [{0:2}] updates[{1:6}] train loss[{2:.2f},{3:.2f},{4:.2f}] remaining[{5}]'.format(
+                epoch, model.updates,
+                model.train_loss.value, model.train_loss_q_autodecoded.value, model.train_loss_q_decoded.value,
                 str((datetime.now() - start) / (i + 1) * (len(batches) - i - 1)).split('.')[0]))
     log.debug('\n')
     del batches
