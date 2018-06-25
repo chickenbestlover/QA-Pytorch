@@ -30,6 +30,7 @@ class Inference(object):
         self.pos2idx_dict = self.get_data(args.data_path + 'pos2id.json')
         self.ner2idx_dict = self.get_data(args.data_path + 'ner2id.json')
         self.model = QAModel(opt, embedding=None, state_dict=state_dict)
+        self.model.network.eval()
 
     def get_data(self,filename):
         with open(filename, 'r', encoding='utf-8') as f:
@@ -232,8 +233,9 @@ class Inference(object):
 
 
 def translate(text,target='en',verbose=True):
-    client_ids = ["oEooJH6eT7xUFD5CT95j","ox4piK3YeFv28nLO89dN"]
-    client_secrets = ["KPrgMruWXq","LOUsauFrbP"]
+    client_ids = ["tzIRWlERjqf5B9BEnm9N"]
+    client_secrets = ["YVIR2_jaNv"]
+    
     idx=random.randrange(len(client_ids))
     text_enc = urllib.parse.quote(text)
     data = "query=" + text_enc
@@ -304,55 +306,55 @@ print(opt)
 print('[Data loaded.] \n')
 
 infer = Inference(opt)
+if __name__=="__main__":
+    while True:
 
-while True:
+        try:
+            try:
+                evidence = input(colored('Evidence: ','blue'))
+                if evidence.strip(): pass
+            except UnicodeDecodeError as e:
+                print(e)
+                print(colored('Error  : ','red'),'Please try again with another natural language input.\n')
+                continue
+            try:
+                rescode_e, evidence, lang_e = translate(evidence, 'en')
+            except:
+                pass
+            try:
+                question = input(colored('Question: ','blue'))
+                if question.strip(): pass
 
-    try:
-        try:
-            evidence = input(colored('Evidence: ','blue'))
-            if evidence.strip(): pass
-        except UnicodeDecodeError as e:
-            print(e)
-            print(colored('Error  : ','red'),'Please try again with another natural language input.\n')
-            continue
-        try:
-            rescode_e, evidence, lang_e = translate(evidence, 'en')
-        except:
-            pass
-        try:
-            question = input(colored('Question: ','blue'))
-            if question.strip(): pass
+            except UnicodeDecodeError as e:
+                print(e)
+                print(colored('Error  : ', 'red'), 'Please try again with another natural language input. \n')
+                continue
+            try:
+                rescode_q, question, lang_q = translate(question, 'en')
+            except:
+                lang_q = 'en'
+                pass
 
-        except UnicodeDecodeError as e:
+
+        except EOFError:
+            print()
+            break
+        except KeyboardInterrupt:
+            print("Exit the program.")
+            exit()
+
+        start_time = time.time()
+
+        try:
+            prediction=infer.response(evidence,question)
+            rescode_p, prediction, _ = translate(prediction,lang_q,verbose=False)
+        except Exception as e:
             print(e)
             print(colored('Error  : ', 'red'), 'Please try again with another natural language input. \n')
             continue
-        try:
-            rescode_q, question, lang_q = translate(question, 'en')
-        except:
-            lang_q = 'en'
-            pass
-
-
-    except EOFError:
-        print()
-        break
-    except KeyboardInterrupt:
-        print("Exit the program.")
-        exit()
-
-    start_time = time.time()
-
-    try:
-        prediction=infer.response(evidence,question)
-        rescode_p, prediction, _ = translate(prediction,lang_q,verbose=False)
-    except Exception as e:
-        print(e)
-        print(colored('Error  : ', 'red'), 'Please try again with another natural language input. \n')
-        continue
-    end_time = time.time()
-    print(colored('Time    : ','green'),'{:.4f}s'.format(end_time - start_time))
-    print(colored('Answer  : ','green'),'{}'.format(prediction),'\n')
+        end_time = time.time()
+        print(colored('Time    : ','green'),'{:.4f}s'.format(end_time - start_time))
+        print(colored('Answer  : ','green'),'{}'.format(prediction),'\n')
 
 
 sample_context = "In meteorology, precipitation is any product of the condensation " \
